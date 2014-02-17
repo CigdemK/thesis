@@ -1,5 +1,6 @@
 function F = Functions
     F.ReadData = @ReadData;
+    F.ReadMovie = @ReadMovie;
     F.CalculateMapping = @CalculateMapping;
     F.CalculateMeanSaliency = @CalculateMeanSaliency;
     F.CreateWindow = @CreateWindow;
@@ -54,6 +55,13 @@ function ReadData( foldername,filename )
     videoResY   = videoResY( find( index == 1 ) );
     
     save('Data.mat');   
+end
+
+function [mov] = ReadMovie( video , nFrames , vidHeight   ,vidWidth)
+    mov( 1 : floor( nFrames ))= struct('cdata',zeros(vidHeight   ,vidWidth   , 3,'uint8'),'colormap',[]);
+    for k = 1 : nFrames
+        mov(k).cdata = read(video, k);    
+    end
 end
 
 function CalculateMapping()
