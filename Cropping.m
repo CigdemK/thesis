@@ -1,32 +1,112 @@
 %% INITIALIZATION
 clc, clear,
 
+FolderName = '../holywood2/getoutofcar/';
+FileName = 'actioncliptrain00121.avi';
+
 RATIO = [16 9]; % aspect ratio of smartphones
 CROP =10; %the crop value will be multiplied with aspect ration to get crop window
 
 CROPPINGX = CROP * RATIO(1,1);
 CROPPINGY = CROP * RATIO(1,2);
 
-FolderName = './holywood2/fight/';
-FileName = 'actioncliptrain00172.avi';
-
 UtilFunctions = Functions;
 
-
-%% CREATING THE CROPPED MOVIE
+%% CREATE OPTICAL FLOW OF THE MOVIE
 
 UtilFunctions.ReadData(FolderName,FileName);
+load('Data.mat');
+mov = UtilFunctions.NewMovie(nFrames , vidHeight   ,vidWidth);
+mov = UtilFunctions.ReadMovie(mov , video , nFrames );
+
+% set optical flow parameters (see Coarse2FineTwoFrames.m for the definition of the parameters)
+alpha = 0.012;
+ratio = 0.75;
+minWidth = 20;
+nOuterFPIterations = 7;
+nInnerFPIterations = 1;
+nSORIterations = 30;
+
+para = [alpha,ratio,minWidth,nOuterFPIterations,nInnerFPIterations,nSORIterations];
+
+tic;
+% Create cropped movie with cropX cropY values
+movOpticalFlow = UtilFunctions.NewMovie(nFrames , vidHeight   ,vidWidth);
+for k = 1 : nFrames-1
+    
+    im1 = mov(k).cdata;
+    im2 = mov(k+1).cdata;
+    [vx,vy,warpI2] = Coarse2FineTwoFrames(im1,im2,para);
+    
+    clear flow;
+    flow(:,:,1) = vx;
+    flow(:,:,2) = vy;
+    imflow = flowToColor(flow);
+    movOpticalFlow(k).cdata = imflow;
+    
+end
+movOpticalFlow(k).cdata = imflow;
+toc;
+
+% Save the output
+movie2avi(movOpticalFlow, strcat(FolderName , FileName,'_opticalFlow.avi') , 'fps',  vidFPS);
+
+%% CREATING THE CROPPED MOVIE WITH A SALIENCY ALGORITHM
+
+UtilFunctions.ReadData(FolderName,FileName);
+load('Data.mat');
+mov = UtilFunctions.NewMovie(nFrames , vidHeight   ,vidWidth);
+mov = UtilFunctions.ReadMovie(mov , video , nFrames );
+
+tic;
+saliencyPoints = [];
+allPoints = [];
+for k = 1 : nFrames
+%     frame_map = gbvs(mov(k).cdata); 
+%     [r c] = find(frame_map.master_map_resized>0.2);
+    frame_map = saliency(mov(k).cdata);
+    [r c] = find(frame_map>0.6);
+    allPoints = cat(3,allPoints,frame_map);
+    sizer = size(r);
+    saliencyPoints = [saliencyPoints ; [repmat(k,sizer,1) r c]];
+end
+toc;
+
+[ avgSaliency , distances ] = UtilFunctions.CalculateMeanSaliency( nFrames , saliencyPoints );
+shotBoundaries = UtilFunctions.DetectShotBoundaries( mov );
+[avgFlowOptical] = UtilFunctions.CreateFlow( 'saliency' , shotBoundaries, avgSaliency , mov , 1 ); % 'saliency' or 'optical'
+toc;
+save(strcat(FolderName , FileName,'.mat'));
+% load(strcat(FolderName , FileName,'.mat'));UtilFunctions = Functions;
+
+CROPARRAY = UtilFunctions.EstimateWindowSize(avgFlowOptical, saliencyPoints , shotBoundaries , CROP , RATIO , [vidWidth vidHeight]);
+[cropX cropY] = UtilFunctions.CreateWindow( CROPARRAY .* RATIO(1,1) , CROPARRAY .* RATIO(1,2) , avgFlowOptical(1:nFrames,:) , vidWidth , vidHeight );
+
+% Create cropped movie with cropX cropY values
+movCropped = UtilFunctions.NewMovie(nFrames , vidHeight   ,vidWidth);
+for k = 1 : nFrames
+    crop = mov(k).cdata( cropY(k,1):cropY(k,2) , cropX(k,1):cropX(k,2) , : );
+    movCropped(k).cdata = imresize(crop , [vidHeight   ,vidWidth]);
+end
+
+% Save the output
+movie2avi(movCropped, strcat(FolderName , FileName,'_cropped1.avi') , 'fps',  vidFPS);
+
+%% CREATING THE CROPPED MOVIE WITH EYETRACKING INFO
+
+UtilFunctions.ReadData(FolderName,FileName);
+UtilFunctions.ReadEyeTrackingData(FolderName,FileName);
 UtilFunctions.CalculateMapping();
 load('Data.mat');
 
 % Create movie structure & find optical flow per shot
 mov = UtilFunctions.ReadMovie( video , nFrames , vidHeight , vidWidth);
-[avgSaliency,distances] = UtilFunctions.CalculateMeanSaliency( nFrames , frames , eyes);
+[avgSaliency,distances] = UtilFunctions.CalculateMeanSaliency( nFrames , eyes);
 shotBoundaries = UtilFunctions.DetectShotBoundaries( mov );
 [avgFlowOptical] = UtilFunctions.CreateFlow( 'optical' , shotBoundaries, avgSaliency , mov , 1 ); % 'saliency' or 'optical'
 [avgFlowSaliency] = UtilFunctions.CreateFlow( 'saliency' , shotBoundaries, avgSaliency , mov , 1 ); % 'saliency' or 'optical'
 
-% save(strcat(FolderName , FileName,'.mat'));
+save(strcat(FolderName , FileName,'.mat'));
 % load(strcat( FolderName, FileName,'.mat'));
 
 CROPARRAY = UtilFunctions.EstimateWindowSize(avgFlowOptical, eyes , shotBoundaries , CROP , RATIO , [vidWidth vidHeight]);
@@ -98,7 +178,6 @@ end
 % Plotting the trajectory of center of attention
 UtilFunctions.PlotTrajectory2D( avgSaliency , 15);
 UtilFunctions.PlotTrajectory3D( avgSaliency );
-
 
 % Seam Carving and Linear Scaling for the Report
 originalFrame = imread('C:\Users\ckocb_000\Desktop\courses\albert\project\Project\holywood2\fight\frames_original_2\video00035.jpg');

@@ -1,6 +1,8 @@
 function F = Functions
     F.ReadData = @ReadData;
+    F.ReadEyeTrackingData = @ReadEyeTrackingData;
     F.ReadMovie = @ReadMovie;
+    F.NewMovie = @NewMovie;
     F.CalculateMapping = @CalculateMapping;
     F.CalculateMeanSaliency = @CalculateMeanSaliency;
     F.CreateWindow = @CreateWindow;
@@ -28,6 +30,12 @@ function ReadData( foldername,filename )
     vidFPS      = video.FrameRate;
     vidDuration = video.Duration;
 
+    save('Data.mat');   
+end
+
+function ReadEyeTrackingData(foldername,filename)
+
+    load('Data.mat');
     % Read eye tracking data
     fid = fopen( strcat(foldername,'006_' , filename , '.txt') );
     data = textscan( fid , '%d %f %f %f %f %s' );
@@ -37,14 +45,14 @@ function ReadData( foldername,filename )
     yScreen     = cell2mat( data( 5 ) );
     
     % Read calibration of the experiment setup
-    fid = fopen( 'holywood2\geometry.txt' );
+    fid = fopen( '../holywood2/geometry.txt' );
     data = textscan( fid , '%f %f %f %d %d' );
     screenResX   = cell2mat( data( 4 ) );
     screenResY   = cell2mat( data( 5 ) );
     fclose( fid );
     
     % Read screen resolution data
-    fid = fopen( 'holywood2\resolution.txt' );
+    fid = fopen( '../holywood2/resolution.txt' );
     data = textscan( fid , '%s %d %d %f' );
     fclose( fid );
     vidNames =  [ data{ 1 } ] ;
@@ -53,15 +61,18 @@ function ReadData( foldername,filename )
     videoResX   = videoResX( find( index == 1 ) );
     videoResY   = cell2mat( data( 3 ) );
     videoResY   = videoResY( find( index == 1 ) );
-    
-    save('Data.mat');   
+   
+    save('Data.mat');  
 end
 
-function [mov] = ReadMovie( video , nFrames , vidHeight   ,vidWidth)
-    mov( 1 : floor( nFrames ))= struct('cdata',zeros(vidHeight   ,vidWidth   , 3,'uint8'),'colormap',[]);
+function [mov] = ReadMovie( mov , video , nFrames )
     for k = 1 : nFrames
         mov(k).cdata = read(video, k);    
     end
+end
+
+function [mov] = NewMovie(nFrames , vidHeight   ,vidWidth )
+    mov( 1 : floor( nFrames ))= struct('cdata',zeros(vidHeight   ,vidWidth   , 3,'uint8'),'colormap',[]);
 end
 
 function CalculateMapping()
@@ -70,17 +81,17 @@ function CalculateMapping()
     b           = ( double( screenResY ) - double( videoResY ) / a ) / 2;
     xHeight     = a * xScreen;
     yHeight     = a * ( yScreen - b );
-    frames      = round( nFrames * timeStamp / ( vidDuration * 1000000 ) );
+    frames      = round( nFrames * timeStamp / ( vidDuration * 1000000 ) ) +1;
     eyes        = [ frames xHeight yHeight ];
     eyes      = eyes( eyes(:,1) <= nFrames,:  );
     save('Data.mat');
 end
 
-function [avg,distances] = CalculateMeanSaliency( maxFrame , frames , eyes )
+function [avg,distances] = CalculateMeanSaliency( maxFrame  , eyes )
     avg = [];
     distances = [];
-    for k = 0 : maxFrame
-        indices = find( frames( : , 1 ) == k );
+    for k = 1 : maxFrame+1
+        indices = find( eyes( : , 1 ) == k );
         avg = [ avg ; mean( eyes ( indices(:) , 2:3 ) ) ];
         if k > 1
             distances(k-1) = dist(avg(k),avg(k-1)');
@@ -130,7 +141,7 @@ function PlotTrajectory2D( data , fitPower )
     hold on;
     ploty = polyval( p , plotx );
     plot(plotx, ploty, '-');
-    axis([0 500 0 400])
+    axis([0 500 0 400]);
     hold off;
 end
 
@@ -157,7 +168,7 @@ function [shotBoundaries] = DetectShotBoundaries( mov )
         previous = current;
     end
     
-    shotBoundaries = peakfinder(absDiff , 5*mean(absDiff));
+    shotBoundaries = peakfinder(absDiff , 6*mean(absDiff));
     
     if isempty(shotBoundaries)
         shotBoundaries = [1;nrFrames];
