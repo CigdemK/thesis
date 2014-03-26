@@ -52,7 +52,11 @@ toc;
 movie2avi(movOpticalFlow, strcat(FolderName , FileName,'_opticalFlow.avi') , 'fps',  vidFPS);
 
 %% CREATING THE CROPPED MOVIE WITH A SALIENCY ALGORITHM
-
+clear;clc;
+FolderName = '../CAMO_Videos/Tilt/';
+FileName = 'Tilt0015.avi';
+UtilFunctions = Functions;
+load(strcat(FolderName,FileName,'.mat'));
 UtilFunctions.ReadData(FolderName,FileName);
 load('Data.mat');
 mov = UtilFunctions.NewMovie(nFrames , vidHeight   ,vidWidth);
@@ -62,10 +66,11 @@ tic;
 saliencyPoints = [];
 allPoints = [];
 for k = 1 : nFrames
-%     frame_map = gbvs(mov(k).cdata); 
-%     [r c] = find(frame_map.master_map_resized>0.2);
+    frame_map = gbvs(mov(k).cdata); 
+    [r c] = find(frame_map.master_map_resized>0.2);
     frame_map = saliency(mov(k).cdata);
-    [r c] = find(frame_map>0.6);
+    frame_map = grayFrames(:,:,k);
+    [r c] = find(frame_map>0.5);
     allPoints = cat(3,allPoints,frame_map);
     sizer = size(r);
     saliencyPoints = [saliencyPoints ; [repmat(k,sizer,1) r c]];
@@ -74,14 +79,14 @@ toc;
 
 [ avgSaliency , distances ] = UtilFunctions.CalculateMeanSaliency( nFrames , saliencyPoints );
 shotBoundaries = UtilFunctions.DetectShotBoundaries( mov );
-[avgFlowOptical] = UtilFunctions.CreateFlow( 'saliency' , shotBoundaries, avgSaliency , mov , 1 ); % 'saliency' or 'optical'
+[avgFlowOptical] = UtilFunctions.CreateFlow( 'optical' , shotBoundaries, avgSaliency , mov , 1,energyMap ); % 'saliency' or 'optical'
 toc;
-save(strcat(FolderName , FileName,'.mat'));
-% load(strcat(FolderName , FileName,'.mat'));UtilFunctions = Functions;
+save(strcat(FolderName , FileName,'_2.mat'));
+load(strcat(FolderName , FileName,'.mat'));UtilFunctions = Functions;
 
 CROPARRAY = UtilFunctions.EstimateWindowSize(avgFlowOptical, saliencyPoints , shotBoundaries , CROP , RATIO , [vidWidth vidHeight]);
 [cropX cropY] = UtilFunctions.CreateWindow( CROPARRAY .* RATIO(1,1) , CROPARRAY .* RATIO(1,2) , avgFlowOptical(1:nFrames,:) , vidWidth , vidHeight );
-
+toc;
 % Create cropped movie with cropX cropY values
 movCropped = UtilFunctions.NewMovie(nFrames , vidHeight   ,vidWidth);
 for k = 1 : nFrames
@@ -91,7 +96,9 @@ end
 
 % Save the output
 movie2avi(movCropped, strcat(FolderName , FileName,'_cropped1.avi') , 'fps',  vidFPS);
+toc;
 
+save(strcat(FolderName,FileName,'.mat'));
 %% CREATING THE CROPPED MOVIE WITH EYETRACKING INFO
 
 UtilFunctions.ReadData(FolderName,FileName);

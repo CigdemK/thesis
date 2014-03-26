@@ -256,7 +256,7 @@ function [avgFlow] = CalculateFlowMean(avg , Vx ,Vy )
     end 
 end
 
-function [avgFlow] = CreateFlow(mode, shotBoundaries, avgSaliency , mov , WINDOW_SIZE )
+function [avgFlow] = CreateFlow(mode, shotBoundaries, avgSaliency , mov , WINDOW_SIZE,opticalFlowMap )
 
     avgFlow = [];
     nrShots = length(shotBoundaries)-1;
@@ -265,8 +265,9 @@ function [avgFlow] = CreateFlow(mode, shotBoundaries, avgSaliency , mov , WINDOW
         shotEnd = shotBoundaries(k+1)-1;
         shotSaliency = avgSaliency( shotStart:shotEnd , :);
         
+        
         if strcmp(mode,'optical')
-            [Vx,Vy] = FlowSpeed(mov(shotStart:shotEnd) , WINDOW_SIZE , shotStart , shotEnd);
+            [Vx,Vy] = FlowSpeed(mov(shotStart:shotEnd) , WINDOW_SIZE , shotStart , shotEnd, opticalFlowMap(:,:,shotStart:shotEnd));
         elseif strcmp(mode,'saliency')  
             [Vx,Vy] = SaliencySpeed(shotSaliency);
         end
@@ -295,13 +296,26 @@ function [Vx,Vy] = SaliencySpeed(avgSaliency)
     end    
 end
 
-function [Vx,Vy] = FlowSpeed(mov , WINDOW_SIZE , shotStart , shotEnd)
+function [Vx,Vy] = FlowSpeed(mov , WINDOW_SIZE , shotStart , shotEnd , opticalFlowMap)
     
         Vx = [0];
         Vy = [0];
         shotLength = shotEnd - shotStart;
+        % set optical flow parameters (see Coarse2FineTwoFrames.m for the definition of the parameters)
+        alpha = 0.012;
+        ratio = 0.75;
+        minWidth = 20;
+        nOuterFPIterations = 7;
+        nInnerFPIterations = 1;
+        nSORIterations = 30;
+
+        para = [alpha,ratio,minWidth,nOuterFPIterations,nInnerFPIterations,nSORIterations];
+
+%         for t = 2 : shotLength-WINDOW_SIZE 
         for t = 2 : shotLength-WINDOW_SIZE 
-            [VxTemp  VyTemp ] = CameraSpeed(mov(t:t+WINDOW_SIZE));
+%             [VxTemp  VyTemp dummy] = Coarse2FineTwoFrames(mov(t).cdata,mov(t+1).cdata,para);
+            VxTemp = opticalFlowMap(:,:,t);
+            VyTemp = 0;
             meanX = mean(VxTemp(:));
             meanY = mean(VyTemp(:));
             VxTemp = mean(mean([(VxTemp(:)<meanX*0.9) (VxTemp(:)>meanX*(-0.9))]));
