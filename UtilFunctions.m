@@ -3,6 +3,7 @@ function F = UtilFunctions
     F.PlotTrajectory2D = @PlotTrajectory2D;
     F.PlotTrajectory3D = @PlotTrajectory3D;
     F.CalculateMapping = @CalculateMapping; %wont work
+    F.Homography = @Homography;
 end
 
 function [bool] = CheckIsInside(center , minSize , point , maxSize)
@@ -20,17 +21,26 @@ function [bool] = CheckIsInside(center , minSize , point , maxSize)
 end
 
 function PlotTrajectory2D( data , fitPower )
-    figure;
     x = double(data( : , 1 ));
     y = double(data( : , 2 ));
-    p = polyfit( x , y , fitPower );
-    plotx= linspace( min(x) , max(x));
+%     p = polyfit( x , y , fitPower );
+%     plotx= linspace( min(x) , max(x));
+%     hold on;
+    c = jet(98);
+    scatter(x,y,50,c);    
     hold on;
-    plot( x , y ,  'x' );    
+%     ploty = polyval( p , plotx );
+%     plot(plotx, ploty, '-');
+    axis([250 350 200 300]);
     hold on;
-    ploty = polyval( p , plotx );
-    plot(plotx, ploty, '-');
-    axis([0 500 0 400]);
+    
+%     labels = {'10th frame','20th frame','30th frame','40th frame','10th frame','20th frame','30th frame','40th frame','10th frame','20th frame'};
+    a = colorbar;
+    set(gca, 'CLim', [1, 98]);
+    set(a, 'YTick', 1:10:98); 
+    set(a, 'YTickLabel', {'1st Frame','10th Frame','20th Frame','30th Frame','40th Frame','50th Frame','60th Frame','70th Frame','80th Frame','90th Frame'});
+    xlabel('Frame Width');
+    ylabel('Frame Height');
     hold off;
 end
 
@@ -55,4 +65,23 @@ function CalculateMapping()
     eyes        = [ frames xHeight yHeight ];
     eyes      = eyes( eyes(:,1) <= nFrames,:  );
     save('Data.mat');
+end
+
+function [ H ] = Homography(img1,img2)
+% Maps the points in the second image to the first image.
+% Returns the homography matrix of img1-->img2
+
+    I = single(rgb2gray(img1));
+    J = single(rgb2gray(img2));
+      
+    % Apply SIFT and find matching points
+    [features1,distances1] = vl_sift(I);
+    [features2,distances2] = vl_sift(J);
+    [matches ~] = vl_ubcmatch(distances1,distances2,5);
+
+    % Find transformation matrix and apply transformation
+    H = findHomography( ...
+         [features1( 1 , matches( 1 , : ) ) ; features1( 2 , matches( 1 , : ) ) ],...
+         [features2(1 , matches( 2 , : ));features2( 2 , matches( 2 , : ) ) ]);
+
 end

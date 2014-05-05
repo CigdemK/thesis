@@ -9,6 +9,10 @@ function SeamCarvingCustom(FolderName , FileName , CROP , RATIO , seamNumber)
     mov = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);
     mov = Reader.ReadMovie(mov , video );
     
+    
+mov = mov(1:4);
+nFrames = length(mov);
+
     % Define matrices for optimized seam carving
     seamVector = zeros(vidHeight , nFrames);
     KPE = zeros( NKP , nFrames);
@@ -118,7 +122,7 @@ function SeamCarvingCustom(FolderName , FileName , CROP , RATIO , seamNumber)
             toc;
         end
         
-        fprintf('\nNumber of seams removed = %d' , t);
+        fprintf('\nNumber of seams removed = %d\n' , t);
     end
 
     movie2avi(mov, strcat(FolderName , FileName,'_seamCarved_100.avi') , 'fps',  vidFPS);

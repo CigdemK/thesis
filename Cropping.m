@@ -2,9 +2,12 @@ function F = Cropping
     F.CropWithHomography = @CropWithHomography;
     F.ShowSaliencyPoints = @ShowSaliencyPoints;
     F.CropWithVideoSaliency = @CropWithVideoSaliency;
+    F.SaveFrames = @SaveFrames;
 end
 
 function ShowSaliencyPoints(FolderName , FileName , mode) %mode = 'all' or 'mean'
+
+    warning ('off','all');
 
     Reader = ReadFunctions;
     Cropper = CropFunctions;
@@ -15,8 +18,10 @@ function ShowSaliencyPoints(FolderName , FileName , mode) %mode = 'all' or 'mean
     movAllPoints = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);
     movAllPoints = Reader.ReadMovie(movAllPoints , video );
     
+% movAllPoints = movAllPoints(1:4);
+% nFrames = length(movAllPoints);
     Video = VideoFunctions;
-    saliencyPoints = Video.CalculateVideoSaliency(movAllPoints);
+    [saliencyPoints,~] = Video.CalculateVideoSaliency(movAllPoints);
 %     load(strcat(FolderName , FileName,'.mat') , 'saliencyPoints' );
 
     DOT = repmat(0.5,nFrames,1);
@@ -27,8 +32,8 @@ function ShowSaliencyPoints(FolderName , FileName , mode) %mode = 'all' or 'mean
             indices = find( saliencyPoints( : , 1 ) == k );
             nrIndices = length(indices);
 
-            Fx = saliencyPoints( indices( 1:nrIndices ) , 2 );
-            Fy = saliencyPoints( indices( 1:nrIndices ) , 3 );
+            Fx = saliencyPoints( indices( 1:nrIndices ) , 3 );
+            Fy = saliencyPoints( indices( 1:nrIndices ) , 2 );
 
             for i = 1:nrIndices
                 [ cropX cropY ] = Cropper.CreateWindow( DOT , DOT , [Fx(i) Fy(i)] , vidWidth , vidHeight );
@@ -42,7 +47,9 @@ function ShowSaliencyPoints(FolderName , FileName , mode) %mode = 'all' or 'mean
         for k = 1 : nFrames
             
             avgSaliency = Video.CalculateMeanSaliency( nFrames , saliencyPoints );
-            [ cropX cropY ] = Cropper.CreateWindow( DOT.*7 , DOT.*7, avgSaliency , vidWidth , vidHeight );
+            Fx = avgSaliency(:,2);
+            Fy = avgSaliency(:,1);
+            [ cropX cropY ] = Cropper.CreateWindow( DOT.*7 , DOT.*7, [Fx , Fy] , vidWidth , vidHeight );
             redDot = cat( 3 , 254*ones(cropX(1,2)-cropX(1,1)+1 , cropY(1,2)-cropY(1,1)+1) , ...
                             zeros(cropX(1,2)-cropX(1,1)+1 , cropY(1,2)-cropY(1,1)+1), ...
                             zeros(cropX(1,2)-cropX(1,1)+1 , cropY(1,2)-cropY(1,1)+1));
@@ -102,31 +109,51 @@ function CropWithVideoSaliency(FolderName,FileName,CROP,RATIO,mode) %mode = 'opt
     mov = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);
     mov = Reader.ReadMovie(mov , video );
 
+% mov = mov(1:4);
+% nFrames = length(mov);
+    
     Video = VideoFunctions;    
-    saliencyPoints = Video.CalculateVideoSaliency(mov);
+    [saliencyPoints , opticalFlowMap] = Video.CalculateVideoSaliency(mov);
     avgSaliency = Video.CalculateMeanSaliency( nFrames , saliencyPoints );   
     shotBoundaries = Video.DetectShotBoundaries( mov );
-    [avgFlowOptical_h] = Video.CreateFlow( mode , shotBoundaries , avgSaliency , mov , 4 ); % 'saliency' or 'optical' or 'homography'
-
-%     save(strcat(FolderName , FileName,'.mat'));
-%     load(strcat(FolderName , FileName,'.mat'));
+    [avgFlowOptical_h] = Video.CreateFlow( mode , shotBoundaries , avgSaliency , mov , 5,opticalFlowMap ); % 'saliency' or 'optical' or 'homography'
 
     Cropper = CropFunctions;
     cropArray = Cropper.EstimateWindowSize(avgFlowOptical_h, saliencyPoints , shotBoundaries , CROP , RATIO , [vidWidth vidHeight]);
     [cropX cropY] = Cropper.CreateWindow( cropArray .* RATIO(1,1) , cropArray .* RATIO(1,2) , avgFlowOptical_h(1:nFrames,:) , vidWidth , vidHeight );
     
+    save(strcat(FolderName , FileName,'.mat'),'-append');
+%     load(strcat(FolderName , FileName,'.mat'));
+
     % Create cropped movie with cropX cropY values
     movCropped = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);
     for k = 1 : nFrames
         crop = mov(k).cdata( cropY(k,1):cropY(k,2) , cropX(k,1):cropX(k,2) , : );
-        movCropped(k).cdata = imresize(crop , [CROP.*RATIO(1,2)*2 ,CROP.*RATIO(1,1)*2]);
+        movCropped(k).cdata = imresize(crop , [CROP.*RATIO(1,2) ,CROP.*RATIO(1,1)]);
     end
 
     % Save the output
     movie2avi(movCropped, strcat(FolderName , FileName,'_cropped_optical.avi') , 'fps',  vidFPS);
 
 end
-% 
+
+function SaveFrames(FolderName , FileName , mode)
+
+    Reader = ReadFunctions;
+    [video,nFrames,vidHeight,vidWidth,~] = Reader.ReadData(FolderName,FileName);
+
+    % Create movie structure 
+    mov = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);
+    mov = Reader.ReadMovie(mov , video );
+
+    dir = sprintf('%sframes_%s_%s', FolderName, strtok(FileName,'.'),mode);
+    mkdir(dir);
+    for k = 1 : nFrames 
+        imwrite(mov(k).cdata, sprintf('%s/frames%05d.jpg', dir , k)); 
+    end 
+
+end
+%
 % %% CREATE OPTICAL FLOW OF THE MOVIE
 % 
 % UtilFunctions.ReadData(FolderName,FileName);
@@ -243,29 +270,8 @@ end
 % % Save the output
 % movie2avi(movCropped, strcat(FolderName , FileName,'_cropped.avi') , 'fps',  vidFPS);
 % 
-% 
-% %% CREATING MOVIE THAT SHOWS CENTER OF SALIENCY PER FRAME
-% 
-% DOT = repmat(5,nFrames,1);
-% movCenter = UtilFunctions.ReadMovie( video , nFrames , vidHeight , vidWidth);
-% 
-% [ cropX cropY ] = UtilFunctions.CreateWindow( DOT , DOT , avgSaliency(2:nFrames+1,:) , vidWidth , vidHeight );
-% 
-% for k = 1 : nFrames
-%     movCenter(k).cdata( cropY(k,1):cropY(k,2) , cropX(k,1):cropX(k,2) , : ) = 254*ones() ;   
-% end
-% 
-% % Save the output
-% movie2avi(movCenter, strcat(FolderName , FileName,'_center.avi') , 'fps',  vidFPS);
-% 
-% 
 
-% %% SAVING FRAMES SEPERATELY
-% 
-% for k = 1 : nFrames 
-%     imwrite(movCenter(k).cdata, sprintf('%s%s/frames_center/frames%05d.jpg', FolderName , FileName, k)); 
-% end 
-% 
+
 % %% FOR REPORT
 % 
 % % Plotting the trajectory of center of attention

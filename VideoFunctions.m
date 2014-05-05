@@ -42,9 +42,10 @@ function [shotBoundaries] = DetectShotBoundaries( mov )
     end
 end
 
-function [avgFlow] = CreateFlow(mode, shotBoundaries, avgSaliency , mov , WINDOW_SIZE )
+function [avgFlow] = CreateFlow(mode, shotBoundaries, avgSaliency , mov , WINDOW_SIZE , opticalFlowMap )
 
-    avgFlow = zeros(length(mov),2);
+%     avgFlow = zeros(length(mov),2);
+    avgFlow = [];
     nrShots = length(shotBoundaries)-1;
     
     for k = 1:nrShots
@@ -54,7 +55,7 @@ function [avgFlow] = CreateFlow(mode, shotBoundaries, avgSaliency , mov , WINDOW
         shotSaliency = avgSaliency( shotStart:shotEnd , :);
         
         if strcmp(mode,'optical')
-            [Vx,Vy] = CameraSpeed(mov(shotStart:shotEnd));
+            [Vx,Vy] = CameraSpeed(mov,opticalFlowMap);
             avgFlowTmp = CalculateFlowMean( shotSaliency(1,:) , Vx ,Vy , 'OpticalFlow' );   
         elseif strcmp(mode,'saliency')  
             [Vx,Vy] = SaliencySpeed(shotSaliency);
@@ -64,10 +65,10 @@ function [avgFlow] = CreateFlow(mode, shotBoundaries, avgSaliency , mov , WINDOW
 %             [Vx,Vy] = CameraSpeed(mov(shotStart:shotEnd));
             avgFlowTmp = CalculateFlowMean(shotSaliency(1,:) , 0 , 0 , 'CameraMotion' , classes );
         end 
-        avgFlow(shotStart:shotEnd,:) = avgFlowTmp;
+%         avgFlow(shotStart:shotEnd,:) = avgFlowTmp;
+        avgFlow = [avgFlow;avgFlowTmp];
     end
-    avgFlowTmp = avgFlowTmp(length(avgFlowTmp),:);
-%     avgFlow = [avgFlow; avgFlowTmp];
+%     avgFlowTmp = avgFlowTmp(length(avgFlowTmp),:);
 end
 
 function [saliencyPoints] = CalculateStaticSaliency(mov)
@@ -88,18 +89,20 @@ function [saliencyPoints] = CalculateStaticSaliency(mov)
 %     save('../CAMO_Videos/Zoom/Zoom0011.avi.mat','saliencyPoints','-append');
 end
 
-function [saliencyPoints] = CalculateVideoSaliency(mov)
+function [saliencyPoints, opticalFlowMap ] = CalculateVideoSaliency(mov)
 
     tic;
         
     nFrames = length(mov);
     saliencyPoints = [];
-    saliencyMap = VideoSaliency(mov);
+    [saliencyMap , opticalFlowMap ] = VideoSaliency(mov);
+
     saliencyMap = mat2gray(saliencyMap);
-    
+   
     for k = 1 : nFrames
         frame_map = saliencyMap(:,:,k);
-        [r c] = find(frame_map>0.9);
+        frame_map = frame_map / max(max(frame_map));
+        [r c] = find(frame_map>0.7);
         sizer = size(r);
         saliencyPoints = [saliencyPoints ; [repmat(k,sizer,1) r c]];
         toc;
@@ -110,14 +113,15 @@ end
 
 %% PRIVATE FUNCTIONS
 
-function [Vx,Vy] = CameraSpeed(mov)
+function [Vx,Vy] = CameraSpeed(mov,opticalFlowMap)
     
         shotLength = length(mov);
         Vx = zeros(shotLength,1);
         Vy = zeros(shotLength,1);
-        disp('Calculating camera speed...');tic;
+        disp('Calculating camera speed...');
             
-        [opticalFlowX,opticalFlowY] = OpticalFlowMap(mov);
+        opticalFlowX = opticalFlowMap(:,:,:,1);
+        opticalFlowY = opticalFlowMap(:,:,:,2);
         
         for t = 1 : shotLength-1
             VxTemp = opticalFlowX(:,:,t);
@@ -140,7 +144,9 @@ end
 function [avgFlow] = CalculateFlowMean(startingPoint , Vx ,Vy , mode , classes)
 
     shotLength = length(Vx);
-    avgFlow = startingPoint;
+    Y = startingPoint(1,1);
+    X = startingPoint(1,2);
+    avgFlow = [X Y];
     meanFlow = [Vx Vy];
     
     dollyMean    = [ 1.0004   -0.0002    0.1011;   -0.0001    1.0006   -0.1093;  0  0  1];
@@ -486,8 +492,9 @@ function varargout = peakfinder(x0, sel, thresh, extrema, include_endpoints)
 end
 
 function [opticalFlowX,opticalFlowY] = OpticalFlowMap(mov)
-    disp('Calculating optical flow...');
 
+%     disp('Calculating optical flow...');
+% 
 %     nFrames = length(mov);
 %     [vidHeight vidWidth ~]= size(mov(1).cdata);
 %     opticalFlowX = zeros(vidHeight,vidWidth,nFrames);
@@ -509,7 +516,7 @@ function [opticalFlowX,opticalFlowY] = OpticalFlowMap(mov)
 %         toc;
 %     end
 %     
-%     save('../CAMO_Videos/Zoom/Zoom0011.avi.mat','opticalFlowX','opticalFlowY','-append');
+%     save('../CAMO_Videos/Tilt/Tilt0002.avi.mat','opticalFlowX','opticalFlowY','-append');
     load('../CAMO_Videos/Tilt/Tilt0007.avi.mat','opticalFlowX','opticalFlowY');
 
 end
@@ -519,7 +526,7 @@ function [H] = CalculateHomography(mov)
 %     nFrames = length(mov);
 %     
 %     disp('Calculating homography...');
-%     % Extract homography matrices f each frame
+% %     Extract homography matrices f each frame
 %     H = [];
 %     for n = 1 : nFrames-1
 %         im1 = mov(n).cdata;
@@ -536,8 +543,9 @@ function [H] = CalculateHomography(mov)
 %     end
 %     H = cat(3,H,h);
 %     
-%     save('../CAMO_Videos/Tilt/Tilt0007.avi.mat','H','-append');
+%     save('../CAMO_Videos/Dolly/Dolly0011.avi.mat','H','-append');
     load('../CAMO_Videos/Tilt/Tilt0007.avi.mat','H');
+
 end
 
 function [staticSaliencyMap] = StaticSaliency(mov)
@@ -549,27 +557,28 @@ function [staticSaliencyMap] = StaticSaliency(mov)
 %     staticSaliencyMap = zeros(vidHeight,vidWidth,nFrames);
 %     
 %     for k = 1 : nFrames
-%         %     frame_map = gbvs(mov(k).cdata); 
-%         %     [r c] = find(frame_map.master_map_resized>0.2);
-%         %     frame_map = grayFrames(:,:,k);
+% % % %             frame_map = gbvs(mov(k).cdata); 
+% % % %             [r c] = find(frame_map.master_map_resized>0.2);
+% % % %             frame_map = grayFrames(:,:,k);
 %         frame_map = saliency(mov(k).cdata);
 %         staticSaliencyMap (:,:,k) = frame_map;
 %         toc;
 %     end
 %     
-%     save('../CAMO_Videos/Tilt/Tilt0007.avi.mat','staticSaliencyMap','-append');
+%     save('../CAMO_Videos/Tilt/Tilt0002.avi.mat','staticSaliencyMap','-append');
     load('../CAMO_Videos/Tilt/Tilt0007.avi.mat','staticSaliencyMap');
 
 end
 
-function [videoSaliencyMap] = VideoSaliency(mov)
+function [videoSaliencyMap , opticalFlowMap ] = VideoSaliency(mov)
 
 %     [vidHeight vidWidth ~]= size(mov(1).cdata);
 %      nFrames = length(mov);
 %     videoSaliencyMap = zeros(vidHeight , vidWidth , nFrames);
 %     
 %     H = CalculateHomography(mov); 
-%     [ opticalFlowMapX , opticalFlowMapY ] = OpticalFlowMap(mov);
+    [ opticalFlowMapX , opticalFlowMapY ] = OpticalFlowMap(mov);
+    opticalFlowMap = cat(4,opticalFlowMapX,opticalFlowMapY);
 %     staticSaliency = StaticSaliency(mov);
 %     
 %     load('data/f_w.mat');
@@ -578,7 +587,10 @@ function [videoSaliencyMap] = VideoSaliency(mov)
 %     for n = 1 : nFrames-1
 %         
 %         dynamicSaliency = sqrt( opticalFlowMapX(:,:,n) .^ 2 + opticalFlowMapY(:,:,n) .^ 2 );
-%         Divide into patches
+%         dynamicSaliency = dynamicSaliency/max(max(dynamicSaliency));
+%         currentStaticSaliency = staticSaliency(:,:,n)/max(max(staticSaliency(:,:,n)));
+% 
+% %         Divide into patches
 %         i=1;
 %         nrPatches = floor( vidHeight / 9 )*floor( vidWidth / 9 );
 %         xy = zeros(nrPatches,2);
@@ -607,8 +619,11 @@ function [videoSaliencyMap] = VideoSaliency(mov)
 %                 wv = fv(inputs);
 %                 wi = reshape(wi,[9 9]);
 %                 wv = reshape(wv,[9 9]);
+%                 
+%                 wi = wi/(2*max(max(wi)));
+%                 wv = wv/(2*max(max(wv)));
 % 
-%                 videoSaliency = wi*staticSaliency((k*9-8) : (k*9) , (t*9-8) : (t*9) , n)  + ...
+%                 videoSaliency = wi*currentStaticSaliency((k*9-8) : (k*9) , (t*9-8) : (t*9))  + ...
 %                     wv*dynamicSaliency((k*9-8) : (k*9) , (t*9-8) : (t*9) );
 %                 currentFrame(k*9-8:k*9,t*9-8:t*9) = videoSaliency(:,:);
 % 
@@ -616,11 +631,13 @@ function [videoSaliencyMap] = VideoSaliency(mov)
 %                 toc;
 %             end
 %         end
-%     
+%         
 %         videoSaliencyMap(:,:,n) = currentFrame;
 %     end
-%     save('../CAMO_Videos/Zoom/Zoom0011.avi.mat','videoSaliencyMap','-append');
-    load('../CAMO_Videos/Tilt/Tilt0007.avi.mat','videoSaliencyMap');
+%     
+%     save('../CAMO_Videos/Tilt/Tilt0002.avi.mat','videoSaliencyMap','-append');
+    load('../CAMO_Videos/Tilt/Tilt0007.avi.mat','videoSaliencyMap','opticalFlowX','opticalFlowY');
+
 
 end
 

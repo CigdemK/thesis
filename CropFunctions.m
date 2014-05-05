@@ -1,6 +1,7 @@
 function F = CropFunctions
     F.EstimateWindowSize = @EstimateWindowSize;
     F.CreateWindow = @CreateWindow;
+    F.RemoveBlackBars = @RemoveBlackBars;
 end
 
 %% PUBLIC FUNCTIONS
@@ -22,8 +23,8 @@ function [crop] = EstimateWindowSize(avgFlow, eyes , shotBoundaries ,minSize , r
             % get all gaze pts in each frame
             indices = find( eyes( : , 1 ) == t );
             nrIndices = length(indices);
-            Fx = eyes( indices( 1:nrIndices ) , 2 );
-            Fy = eyes( indices( 1:nrIndices ) , 3 );
+            Fx = eyes( indices( 1:nrIndices ) , 3 );
+            Fy = eyes( indices( 1:nrIndices ) , 2 );
             points = [Fx Fy];
             points = unique(points, 'rows'); % remove rows having same X-Y values
             
@@ -71,6 +72,27 @@ function [croppedX,croppedY] = CreateWindow( limX , limY , avg , vidWidth , vidH
         croppedY = [croppedY ; [minY maxY] ];
     end
     
+end
+
+function [mov] = RemoveBlackBars(mov)
+    
+    nFrames = length(mov);
+    [vHeight vWidth vDepth] = size(mov(1).cdata);
+%     blackBar = zeros(1,vWidth,3);
+    indices = [];
+    
+    % Detect the rows to be removed
+    for j = 1:vHeight
+        line = mov(1).cdata(j,:,:);
+        if (length(line(line(1,:,:)<10)) == vWidth*vDepth)
+            indices = [indices;j];   
+        end
+    end
+    
+    % Remove rows from all frames
+    for n = 1:nFrames
+        mov(n).cdata(indices,:,:) = [];
+    end
 end
 
 %% PRIVATE FUNCTIONS
