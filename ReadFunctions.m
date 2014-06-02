@@ -9,7 +9,7 @@ end
 
 %% PUBLIC FUNCTIONS
 
-function [video,nFrames,vidHeight,vidWidth,vidFPS] = ReadData( foldername,filename )
+function [video,nFrames,vidHeight,vidWidth,vidFPS,frames] = ReadData( foldername,filename )
 
     % Read video
     video       = VideoReader( strcat(foldername, filename ) );
@@ -17,6 +17,7 @@ function [video,nFrames,vidHeight,vidWidth,vidFPS] = ReadData( foldername,filena
     vidHeight   = video.Height;
     vidWidth    = video.Width;
     vidFPS      = video.FrameRate;
+    frames      = read(video);
     
 end
 

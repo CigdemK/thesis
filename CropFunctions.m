@@ -84,7 +84,7 @@ function [mov] = RemoveBlackBars(mov)
     % Detect the rows to be removed
     for j = 1:vHeight
         line = mov(1).cdata(j,:,:);
-        if (length(line(line(1,:,:)<10)) == vWidth*vDepth)
+        if (length(line(line(1,:,:)<20)) == vWidth*vDepth)
             indices = [indices;j];   
         end
     end
