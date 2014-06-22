@@ -5,26 +5,38 @@ function F = Cropping
     F.SaveFrames = @SaveFrames;
 end
 
-function ShowSaliencyPoints(FolderName , FileName , mode) %mode = 'all' or 'mean'
+function ShowSaliencyPoints(FolderName , FileName , mode, saliency) %mode = 'all' or 'mean'
 
     warning ('off','all');
+    
+    if nargin < 4
+        saliency = 'etimate';
+    end
+    if nargin < 3
+        mode = 'all';
+    end
 
     Reader = ReadFunctions;
     Cropper = CropFunctions;
     Video = VideoFunctions;
+    Util = UtilFunctions;
     
-    [video,nFrames,vidHeight,vidWidth,vidFPS] = Reader.ReadData(FolderName,FileName);
+    [video,nFrames,vidHeight,vidWidth,vidFPS,vidDuration] = Reader.ReadData(FolderName,FileName);
     
     movAllPoints = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);
     movAllPoints = Reader.ReadMovie(movAllPoints , video );
     
-% movAllPoints = movAllPoints(1:4);
-% nFrames = length(movAllPoints);
     Video = VideoFunctions;
-    [saliencyPoints,~] = Video.CalculateVideoSaliency(movAllPoints);
-%     load(strcat(FolderName , FileName,'.mat') , 'saliencyPoints' );
+    if strcmp( saliency , 'estimate' )
+        [saliencyPoints,~] = Video.CalculateVideoSaliency(movAllPoints);
+    elseif strcmp( saliency , 'gaze' )
+        resultMap = Reader.ReadEyeTrackingData(FileName);
+        resultMap.vidDuration = vidDuration;
+        resultMap.nFrames = nFrames;
+        saliencyPoints = Util.CalculateMapping(resultMap);
+    end
 
-    DOT = repmat(0.5,nFrames,1);
+    DOT = repmat(0.7,nFrames,1);
     if strcmp( mode , 'all' )
         
         for k = 1 : nFrames
@@ -39,7 +51,7 @@ function ShowSaliencyPoints(FolderName , FileName , mode) %mode = 'all' or 'mean
                 [ cropX cropY ] = Cropper.CreateWindow( DOT , DOT , [Fx(i) Fy(i)] , vidWidth , vidHeight );
                 movAllPoints(k).cdata( cropY(1):cropY(2) , cropX(1):cropX(2) , : ) = 254*ones() ;   
             end
-            toc;
+      
         end
         
     elseif strcmp( mode , 'mean' )

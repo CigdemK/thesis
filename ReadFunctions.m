@@ -9,7 +9,7 @@ end
 
 %% PUBLIC FUNCTIONS
 
-function [video,nFrames,vidHeight,vidWidth,vidFPS,frames] = ReadData( foldername,filename )
+function [video,nFrames,vidHeight,vidWidth,vidFPS,vidDuration,frames] = ReadData( foldername,filename )
 
     % Read video
     video       = VideoReader( strcat(foldername, filename ) );
@@ -17,30 +17,32 @@ function [video,nFrames,vidHeight,vidWidth,vidFPS,frames] = ReadData( foldername
     vidHeight   = video.Height;
     vidWidth    = video.Width;
     vidFPS      = video.FrameRate;
+    vidDuration = video.Duration;
     frames      = read(video);
     
 end
 
-function ReadEyeTrackingData(foldername,filename)
+function valueSet = ReadEyeTrackingData(filename)
 
-    load('Data.mat');
     % Read eye tracking data
-    fid = fopen( strcat(foldername,'006_' , filename , '.txt') );
-    data = textscan( fid , '%d %f %f %f %f %s' );
-    fclose( fid );
-    timeStamp   = cell2mat( data( 1 ) );
-    xScreen     = cell2mat( data( 4 ) );
-    yScreen     = cell2mat( data( 5 ) );
+    for subjectNumber = 1:6
+        fid = fopen( strcat('../gaze_hollywood2/samples/00',num2str(subjectNumber),'_' , filename , '.txt') );
+        data = textscan( fid , '%d %f %f %f %f %s' );
+        fclose( fid );
+        timeStamp{subjectNumber} = cell2mat( data( 1 ) );
+        xScreen{subjectNumber} = cell2mat( data( 4 ) );
+        yScreen{subjectNumber} = cell2mat( data( 5 ) );
+    end
     
     % Read calibration of the experiment setup
-    fid = fopen( '../holywood2/geometry.txt' );
+    fid = fopen( '../gaze_hollywood2/geometry.txt' );
     data = textscan( fid , '%f %f %f %d %d' );
     screenResX   = cell2mat( data( 4 ) );
     screenResY   = cell2mat( data( 5 ) );
     fclose( fid );
     
     % Read screen resolution data
-    fid = fopen( '../holywood2/resolution.txt' );
+    fid = fopen( '../gaze_hollywood2/resolution.txt' );
     data = textscan( fid , '%s %d %d %f' );
     fclose( fid );
     vidNames =  [ data{ 1 } ] ;
@@ -50,7 +52,15 @@ function ReadEyeTrackingData(foldername,filename)
     videoResY   = cell2mat( data( 3 ) );
     videoResY   = videoResY( find( index == 1 ) );
    
-    save('Data.mat');  
+    valueSet = struct();     
+    valueSet.timeStamp = timeStamp;
+    valueSet.xScreen = xScreen;
+    valueSet.yScreen = yScreen;
+    valueSet.screenResX = screenResX;
+    valueSet.screenResY = screenResY;
+    valueSet.videoResX = videoResX;
+    valueSet.videoResY = videoResY;
+    
 end
 
 function [mov] = ReadMovie( mov , video )

@@ -43,17 +43,66 @@ function scaledPathlines = PerFrameOptimization(FolderName, FileName, newsize)
 %     originalAdjacencies = CalculateAdjacencies(originalPathlines); toc;
 %     scaledAdjacencies   = CalculateAdjacencies(scaledPathlines);  toc;
 % 
-%     correspondances = GetCorrespondances(gridX , gridY , originalPathlines , scaledPathlines, [vidHeight, vidWidth] );
+%     correspondances = GetCorrespondances(gridX, gridY, originalPathlines, scaledPathlines, [vidHeight,vidWidth] );
   
 %     save('tmp.mat'); 
+%     load('tmp.mat');
+%     originalPathlines = originalPathlines(correspondances(:,1),:,:);
+%     scaledPathlines = scaledPathlines(correspondances(:,2),:,:);  
+%     originalAdjacencies = CalculateAdjacencies(originalPathlines);
+% % % Step 3: Optimize Scaling with the Pathlines   
+%     
+%     originalPathlines = permute(originalPathlines , [2 1 3]);
+%     scaledPathlines = permute(scaledPathlines , [2 1 3]);
+    
     load('tmp.mat');
-    
-% % Step 3: Optimize Scaling with the Pathlines   
-    
-    
-    
-%     PlotPathlines(originalPathlines,scaledPathlines,100,correspondances,...
-%         originalAdjacencies,scaledAdjacencies , [vidHeight vidWidth] , newsize);
+    nCorrespondances = size(correspondances,1);
+    S = ones(4,nCorrespondances) ;%+ 0.1* rand(4,nCorrespondances);
+    t = zeros(2,nCorrespondances) ;%+ 0.1* rand(2,nCorrespondances);
+    Sij = ones(4,nCorrespondances) ;%+ 0.1* rand(4,nCorrespondances) ;
+
+    originalPathlines = [originalPathlines;ones(1,nCorrespondances,nFrames)];
+    tic;
+    for k = 1:2
+        for i = 1:nCorrespondances
+            i
+            adjacencyIndices =  originalAdjacencies(originalAdjacencies(:,1) == i,2);
+            nAdjacencies = size(adjacencyIndices,1);
+            
+            adjacencies = [];
+            for j = 1:nAdjacencies
+                adjacencies = [adjacencies,[originalPathlines(:,i,:); ...
+                    originalPathlines(:,adjacencyIndices(j),:); ...
+                    originalPathlines(1:2,i,:) - originalPathlines(1:2,adjacencyIndices(j),:) ]];
+            end
+
+            f = @(S)OmegaFunctions(S, originalPathlines(:,i,:), scaledPathlines(:,i,:),...
+                adjacencies ) ;
+            currentS = [ S(:,i);t(:,i)];
+                   
+            for j = 1:nAdjacencies
+                currentS = [currentS;...
+                   (-1)*S(:,adjacencyIndices(j));...
+                   (-1)*t(:,adjacencyIndices(j));...
+                   (-1)*Sij(:,adjacencyIndices(j))];
+            end
+%             tic;
+            option = optimset('Display','off','LargeScale','off','Algorithm','interior-point');
+            optimalS = fminunc(f,currentS,option);
+%             toc;
+            
+            S(:,i) = optimalS(1:4);
+            t(:,i) = optimalS(5:6);
+            for j = 1:nAdjacencies
+    %                     S(:,adjacencyIndices) = optimalS(1:4,3:2+nAdjacencies);
+    %                     t(:,adjacencyIndices) = optimalS(1:2,3+nAdjacencies:2+2*nAdjacencies);
+                Sij(:,adjacencyIndices(j)) = optimalS(k*6+7:k*6+10);
+            end
+        end
+        toc;
+    end
+
+
 end
 
 function [imgOut, meshXNew , meshYNew]= ScaleStretch(imgIn, newsize)
@@ -310,7 +359,7 @@ function [adjacencies] = CalculateAdjacencies(pathlines)
     adjacencies = [];
     [ ~, ~, nFrames ] = size(pathlines);
     
-    for i = 1:nFrames
+    for i = 1:nFrames % burada bir detay kacmis, sadece bir pathline bu framede baslasa yeter. ben ikisi de burada baslayacak gibi almisim
         
         timeSlice = pathlines(:,:,i);
         actualIndices = find(any(timeSlice,2));
@@ -331,7 +380,7 @@ function [adjacencies] = CalculateAdjacencies(pathlines)
             
             actualIndexSecond = actualIndices(currentAdj);
             actualIndexFirst = repmat( actualIndices(k) , size(currentAdj) );
-            adjacencies = [adjacencies; [ actualIndexFirst actualIndexSecond repmat(i,size(currentAdj))] ] ;
+            adjacencies = [adjacencies; [ actualIndexFirst actualIndexSecond ] ] ;
         
         end
     end
@@ -357,7 +406,7 @@ function [correspondances] = GetCorrespondances(meshXWarped , meshYWarped , ...
         
     end
     
-    correspondances = unique(correspondances, 'rows');
+    correspondances = unique(correspondances, 'rows'); % i suspect this does not work, check this
     
 end
 
@@ -404,6 +453,51 @@ function [correspondances] = GetCorrespondancesPerFrame(meshXWarped , meshYWarpe
     end
 
 end
+
+function y = OmegaFunctions(allInputs, originalPath, scaledPath, adjacencies)
+
+    [~,~, nFrames] = size(originalPath);
+    nAdjacencies = ( size(allInputs,1) - 6 ) / 10;
+%     nAdjacencies = size(adjacencies,2);
+%     originalPath = [originalPath;ones(1,1,nFrames)];
+%     adjacencies = [adjacencies;ones(1,nAdjacencies,nFrames)];
+
+%     Si = reshape( allInputs( 1:4 , 1 ) , [2,2] );
+%     ti = reshape( allInputs( 1:2 , 2 ) , [2,1]);
+%     Sj = reshape( allInputs( 1:4 , 3:2+nAdjacencies ) , [2,2,nAdjacencies]);
+%     tj = reshape( allInputs( 1:2 , 3+nAdjacencies:2+2*nAdjacencies ) , [2,1,nAdjacencies]);
+%     Sij = reshape( allInputs( 1:4 , 3+2*nAdjacencies:end ) , [2,2,nAdjacencies]);
+    SD = reshape( allInputs( 1:6) , [2,3] );
+    SP = [repmat(SD,[1,1,nAdjacencies]) , reshape( allInputs( 7:end ), [2,5,nAdjacencies])];
+
+    omegaD = 0;
+%     currentS = [Si,ti];  
+    for i = 1:nFrames
+        currentError =  SD * originalPath(:,:,i) - scaledPath(:,:,i);
+        omegaD = omegaD + sqrt((currentError(1)^2)+(currentError(2)^2));
+    end
+
+    omegaP = 0;
+    for k = 1: nAdjacencies
+%         currentS = [ Si, ...
+%             ti, ...
+%             (-1).*Sj(:,:,k), ...
+%             (-1).*tj(:,:,k), ...
+%             (-1).*Sij(:,:,k)];
+%          multipliant = [originalPath; ...
+%                     adjacencies(:,k,:); ...
+%                     originalPath(1:2,:,:) - adjacencies(1:2,k,:) ];
+
+        for i = 1:nFrames
+            currentError =  SP(:,:,k) * adjacencies(:,k,i);
+            omegaP = omegaP + sqrt((currentError(1)^2)+(currentError(2)^2));
+        end
+
+    end 
+    
+    y = omegaD * 0.5 + omegaP;
+end
+
 
 % % Functions for ScaleStretch
 
@@ -480,6 +574,7 @@ function warpedImage = WarpImageWithMesh(imgIn , meshX , meshY )
 
 end
 
+
 function PlotPathlines(originalPathlines,scaledPathlines,stepSize,...
     correspondances,originalAdjacencies,scaledAdjacencies , originalSize , scaledSize)
 
@@ -543,5 +638,6 @@ function PlotPathlines(originalPathlines,scaledPathlines,stepSize,...
     
 end
 
-
+%     PlotPathlines(originalPathlines,scaledPathlines,100,correspondances,...
+%         originalAdjacencies,scaledAdjacencies , [vidHeight vidWidth] , newsize);
 

@@ -2,7 +2,7 @@ function F = UtilFunctions
     F.CheckIsInside = @CheckIsInside;
     F.PlotTrajectory2D = @PlotTrajectory2D;
     F.PlotTrajectory3D = @PlotTrajectory3D;
-    F.CalculateMapping = @CalculateMapping; %wont work
+    F.CalculateMapping = @CalculateMapping;
     F.Homography = @Homography;
 end
 
@@ -55,16 +55,31 @@ function PlotTrajectory3D( data )
     hold off;
 end
 
-function CalculateMapping()
-    load('Data.mat')
+function eyes = CalculateMapping(mappingStruct)
+
+    videoResX  = mappingStruct.videoResX;
+    videoResY  = mappingStruct.videoResY;
+    screenResX = mappingStruct.screenResX;
+    screenResY = mappingStruct.screenResY;
+    xScreen    = mappingStruct.xScreen;
+    yScreen    = mappingStruct.yScreen;
+    timeStamp  = mappingStruct.timeStamp;
+    vidDuration= mappingStruct.vidDuration;
+    nFrames    = mappingStruct.nFrames;
+    
     a           = double( videoResX ) / double( screenResX ) ; 
     b           = ( double( screenResY ) - double( videoResY ) / a ) / 2;
-    xHeight     = a * xScreen;
-    yHeight     = a * ( yScreen - b );
-    frames      = round( nFrames * timeStamp / ( vidDuration * 1000000 ) ) +1;
-    eyes        = [ frames xHeight yHeight ];
-    eyes      = eyes( eyes(:,1) <= nFrames,:  );
-    save('Data.mat');
+    eyes = [];
+    for subjectNumber = 1:6
+        xHeight     = a * xScreen{subjectNumber};
+        yHeight     = a * ( yScreen{subjectNumber} - b );
+        frames      = round( nFrames * timeStamp{subjectNumber} / ( vidDuration * 1000000 ) ) +1;
+        eyes        = [ eyes; frames yHeight xHeight];
+    end
+    
+    eyes = eyes( eyes(:,1) <= nFrames & eyes(:,2) > 1 & eyes(:,3) > 1,: );
+    eyes = sortrows(eyes,1);
+
 end
 
 function [ H ] = Homography(img1,img2)
