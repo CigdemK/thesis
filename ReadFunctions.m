@@ -25,13 +25,32 @@ end
 function valueSet = ReadEyeTrackingData(filename)
 
     % Read eye tracking data
-    for subjectNumber = 1:6
-        fid = fopen( strcat('../gaze_hollywood2/samples/00',num2str(subjectNumber),'_' , filename , '.txt') );
+    for subjectNumber = 1:19
+        
+        if subjectNumber < 10
+            currentFileName = strcat('../gaze_hollywood2/samples/00',num2str(subjectNumber),'_' , filename , '.txt');
+        else
+            currentFileName = strcat('../gaze_hollywood2/samples/0',num2str(subjectNumber),'_' , filename , '.txt');
+        end
+        
+        if  ~exist(currentFileName, 'file')
+            continue;
+        end
+        
+        fid = fopen( currentFileName );
         data = textscan( fid , '%d %f %f %f %f %s' );
         fclose( fid );
-        timeStamp{subjectNumber} = cell2mat( data( 1 ) );
-        xScreen{subjectNumber} = cell2mat( data( 4 ) );
-        yScreen{subjectNumber} = cell2mat( data( 5 ) );
+        
+        event = cell2mat(data{:,6});
+        event = event~='B';
+        
+        currentTimeStamp = cell2mat( data( 1 ) );
+        currentXScreen = cell2mat( data( 4 ) );
+        currentYScreen = cell2mat( data( 5 ) );
+        timeStamp{subjectNumber} = currentTimeStamp(event);
+        xScreen{subjectNumber} = currentXScreen(event);
+        yScreen{subjectNumber} = currentYScreen(event);
+    
     end
     
     % Read calibration of the experiment setup

@@ -5,6 +5,6 @@ timerHandle.startDelay = timerTic;
 timerHandle.Period = timerTic;
 timerHandle.ExecutionMode = 'fixedRate';
 timerHandle.TasksToExecute = inf;
-timerHandle.TimerFcn = @mycallbackfunction;
+timerHandle.TimerFcn = @EnableDebugModeNotification;
 
 start(timerHandle);

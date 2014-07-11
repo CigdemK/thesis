@@ -36,7 +36,7 @@ function ShowSaliencyPoints(FolderName , FileName , mode, saliency) %mode = 'all
         saliencyPoints = Util.CalculateMapping(resultMap);
     end
 
-    DOT = repmat(0.7,nFrames,1);
+    DOT = repmat(0.5,nFrames,1);
     if strcmp( mode , 'all' )
         
         for k = 1 : nFrames
@@ -44,8 +44,8 @@ function ShowSaliencyPoints(FolderName , FileName , mode, saliency) %mode = 'all
             indices = find( saliencyPoints( : , 1 ) == k );
             nrIndices = length(indices);
 
-            Fx = saliencyPoints( indices( 1:nrIndices ) , 3 );
-            Fy = saliencyPoints( indices( 1:nrIndices ) , 2 );
+            Fx = saliencyPoints( indices , 3 );
+            Fy = saliencyPoints( indices , 2 );
 
             for i = 1:nrIndices
                 [ cropX cropY ] = Cropper.CreateWindow( DOT , DOT , [Fx(i) Fy(i)] , vidWidth , vidHeight );

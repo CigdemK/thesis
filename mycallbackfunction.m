@@ -1,25 +1,32 @@
-function mycallbackfunction(~,~)
-    if feature('IsDebugMode') % undocumented thanks to CatzLoveJazz
-        load handel
-        sound(y,Fs);
-        evalin('base','stop(timerHandle)') % stop the timer
+function MyCallbackFunction(~,~)
+    
+    if ~exits(flagPlaying)
+        global flagPlaying = false;
     end
-end
 
-
-% stop(timerHandle)
-% delete(timerHandle)
-
-playing = false
-function mycallbackfunction(~,~)
     if feature('IsDebugMode')
-    	if !playing % undocumented thanks to CatzLoveJazz
-        	load handel
+    	if ~flagPalying
+        	load handel;
         	sound(y,Fs);
-        	playing = true
-	end	
+        	flagPlaying = true;
+        end
     else
-    	playing = false
-   	end
-
+    	flagPlaying = false;
+    end
+    
 end
+
+% 
+% function mycallbackfunction(~,~)
+%     if feature('IsDebugMode') % undocumented thanks to CatzLoveJazz
+%         load handel
+%         sound(y,Fs);
+%         evalin('base','stop(timerHandle)') % stop the timer
+%     end
+% end
+% 
+% 
+% % stop(timerHandle)
+% % delete(timerHandle)
+
+
