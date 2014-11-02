@@ -5,6 +5,7 @@ function F = UtilFunctions
     F.CalculateMapping = @CalculateMapping;
     F.Homography = @Homography;
     F.peakfinder = @peakfinder;
+    F.flattenCellArray = @flattenCellArray;
 end
 
 function [bool] = CheckIsInside(center , minSize , point , maxSize)
@@ -56,6 +57,7 @@ function PlotTrajectory3D( data )
     hold off;
 end
 
+% output: eyes = [subjectNr, frameNr, y, x]
 function eyes = CalculateMapping(mappingStruct)
 
     videoResX  = mappingStruct.videoResX;
@@ -359,4 +361,19 @@ function varargout = peakfinder(x0, sel, thresh, extrema, include_endpoints)
     else
         varargout = {peakInds,peakMags};
     end
+end
+
+function C = flattenCellArray(A)
+
+    C = {};
+    for i=1:numel(A)  
+        if(~iscell(A{i}))
+            C = [C,A{i}];
+        else
+           Ctemp = flattenCellArray(A{i});
+           C = [C,Ctemp{:}];
+
+        end
+    end
+    
 end

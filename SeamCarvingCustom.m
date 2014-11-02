@@ -1,17 +1,16 @@
-function SeamCarvingCustom(FolderName , FileName , CROP , RATIO , seamNumber)
+function SeamCarvingCustom(FolderName , FileName , seamNumber , CROP, RATIO)
     warning('off','all');
     
     NKP = 10;
 
     Reader = ReadFunctions;
-    [video,nFrames,vidHeight,vidWidth,vidFPS] = Reader.ReadData(FolderName,FileName);
-    nFrames = 60;
-    mov = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);
+    Crop = CropFunctions;
+    [video,nFrames,originalVidHeight,originalVidWidth,vidFPS,~,~] = Reader.ReadData(FolderName,FileName);
+   
+    mov = Reader.NewMovie(nFrames , originalVidHeight   ,originalVidWidth);
     mov = Reader.ReadMovie(mov , video );
-    
-    
-mov = mov(1:4);
-nFrames = length(mov);
+    mov = Crop.RemoveBlackBars(mov);
+    [vidHeight,vidWidth,~] = size(mov(1).cdata);
 
     % Define matrices for optimized seam carving
     seamVector = zeros(vidHeight , nFrames);
@@ -31,8 +30,8 @@ nFrames = length(mov);
 
         for n = 1:NKP
 
-            start = (vidHeight/NKP)*(n-1)+1;
-            eend  = (vidHeight/NKP)*(n);
+            start = floor((vidHeight/NKP)*(n-1))+1;
+            eend  = floor((vidHeight/NKP)*(n));
 
             y = horzcat((start:eend)',seamVector(start:eend,1));
             energies = arrayfun( @( X )( EM( y( X , 1 ) , y( X , 2) ) ) , 1:length(y) );
@@ -54,8 +53,8 @@ nFrames = length(mov);
 
             for n = 1:NKP
 
-                start = (vidHeight/NKP)*(n-1)+1;
-                eend  = (vidHeight/NKP)*(n);
+                start = floor((vidHeight/NKP)*(n-1))+1;
+                eend  = floor((vidHeight/NKP)*(n));
 
                 y = horzcat((start:eend)',seamVector(start:eend,1));
                 energies = arrayfun( @( X )( EM( y( X , 1 ) , y( X , 2) ) ) , 1:length(y) );
@@ -119,13 +118,15 @@ nFrames = length(mov);
             seamImage = findSeamImg(EM);
             seamVector(:,k) = findSeam(seamImage);
             mov(k).cdata = SeamCut(mov(k).cdata,seamVector(:,k));   
-            toc;
         end
         
         fprintf('\nNumber of seams removed = %d\n' , t);
     end
 
-    movie2avi(mov, strcat(FolderName , FileName,'_seamCarved_100.avi') , 'fps',  vidFPS);
+    for k = 1:nFrames
+        mov(k).cdata = imresize(mov(k).cdata , [CROP.*RATIO(1,2) ,CROP.*RATIO(1,1)]);
+    end
+    movie2avi(mov, strcat(FolderName , FileName,'_seamCarved.avi') , 'fps',  vidFPS);
 
 end
 

@@ -13,6 +13,7 @@ function [video,nFrames,vidHeight,vidWidth,vidFPS,vidDuration,frames] = ReadData
 
     % Read video
     video       = VideoReader( strcat(foldername, filename ) );
+    lastFrame = read(video, inf);
     nFrames     = video.NumberOfFrames;
     vidHeight   = video.Height;
     vidWidth    = video.Width;
@@ -22,15 +23,23 @@ function [video,nFrames,vidHeight,vidWidth,vidFPS,vidDuration,frames] = ReadData
     
 end
 
-function valueSet = ReadEyeTrackingData(filename)
+function valueSet = ReadEyeTrackingData(filename,foldername)
 
+    if regexp( foldername, '.*ucf.*') 
+        gazeFolder = 'gaze_ucfsa';
+        regexResult = regexp(filename,'/','split');
+        filename = strcat(regexResult{1},'_',regexResult{2},'.avi');
+    elseif regexp (foldername , '.*Hollywood.*' )
+        gazeFolder  = 'gaze_hollywood2';
+    end
+   
     % Read eye tracking data
     for subjectNumber = 1:19
         
         if subjectNumber < 10
-            currentFileName = strcat('../gaze_hollywood2/samples/00',num2str(subjectNumber),'_' , filename , '.txt');
+            currentFileName = strcat('../',gazeFolder,'/samples/00',num2str(subjectNumber),'_' , filename , '.txt');
         else
-            currentFileName = strcat('../gaze_hollywood2/samples/0',num2str(subjectNumber),'_' , filename , '.txt');
+            currentFileName = strcat('../',gazeFolder,'/samples/0',num2str(subjectNumber),'_' , filename , '.txt');
         end
         
         if  ~exist(currentFileName, 'file')
@@ -54,14 +63,14 @@ function valueSet = ReadEyeTrackingData(filename)
     end
     
     % Read calibration of the experiment setup
-    fid = fopen( '../gaze_hollywood2/geometry.txt' );
+    fid = fopen( strcat('../',gazeFolder,'/geometry.txt') );
     data = textscan( fid , '%f %f %f %d %d' );
     screenResX   = cell2mat( data( 4 ) );
     screenResY   = cell2mat( data( 5 ) );
     fclose( fid );
     
     % Read screen resolution data
-    fid = fopen( '../gaze_hollywood2/resolution.txt' );
+    fid = fopen( strcat('../',gazeFolder,'/resolution.txt' ));
     data = textscan( fid , '%s %d %d %f' );
     fclose( fid );
     vidNames =  [ data{ 1 } ] ;

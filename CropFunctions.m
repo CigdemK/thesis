@@ -48,10 +48,16 @@ function [croppedX,croppedY] = CreateWindow( limX , limY , avg , vidWidth , vidH
     croppedX = [];
     croppedY = [];
     for k = 1 : size( avg )
+        
         minX = floor( avg( k , 1)) - limX(k) ;
         maxX = floor( avg( k , 1)) + limX(k) ;
         minY = floor( avg( k , 2)) - limY(k) ;
         maxY = floor( avg( k , 2)) + limY(k) ;
+        
+%         if minX <= 0 || maxX > vidWidth || minY <= 0 || maxY > vidHeight
+%             continue;
+%         end
+        
         if minX <= 0 
             minX = 1;
             maxX = 2 * limX(k) + 1 ;

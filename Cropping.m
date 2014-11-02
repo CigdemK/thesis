@@ -28,7 +28,7 @@ function ShowSaliencyPoints(FolderName , FileName , mode, saliency) %mode = 'all
     
     Video = VideoFunctions;
     if strcmp( saliency , 'estimate' )
-        [saliencyPoints,~] = Video.CalculateVideoSaliency(movAllPoints);
+        [saliencyPoints,~] = Video.CalculateVideoSaliency(movAllPoints(1:10));
     elseif strcmp( saliency , 'gaze' )
         resultMap = Reader.ReadEyeTrackingData(FileName);
         resultMap.vidDuration = vidDuration;
@@ -120,11 +120,12 @@ function CropWithVideoSaliency(FolderName,FileName,CROP,RATIO,mode) %mode = 'opt
     % Create movie structure & find optical flow per shot
     mov = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);
     mov = Reader.ReadMovie(mov , video );
-
-% mov = mov(1:4);
-% nFrames = length(mov);
     
-    Video = VideoFunctions;    
+    Crop = CropFunctions; 
+    mov = Crop.RemoveBlackBars(mov);
+    [vidHeight,vidWidth,~] = size(mov(1).cdata);
+    
+    Video = VideoFunctions;
     [saliencyPoints , opticalFlowMap] = Video.CalculateVideoSaliency(mov);
     avgSaliency = Video.CalculateMeanSaliency( nFrames , saliencyPoints );   
     shotBoundaries = Video.DetectShotBoundaries( mov );
@@ -133,9 +134,6 @@ function CropWithVideoSaliency(FolderName,FileName,CROP,RATIO,mode) %mode = 'opt
     Cropper = CropFunctions;
     cropArray = Cropper.EstimateWindowSize(avgFlowOptical_h, saliencyPoints , shotBoundaries , CROP , RATIO , [vidWidth vidHeight]);
     [cropX cropY] = Cropper.CreateWindow( cropArray .* RATIO(1,1) , cropArray .* RATIO(1,2) , avgFlowOptical_h(1:nFrames,:) , vidWidth , vidHeight );
-    
-    save(strcat(FolderName , FileName,'.mat'),'-append');
-%     load(strcat(FolderName , FileName,'.mat'));
 
     % Create cropped movie with cropX cropY values
     movCropped = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);

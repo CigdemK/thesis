@@ -108,7 +108,7 @@ function [saliencyPoints, opticalFlowMap ] = CalculateVideoSaliency(mov)
     for k = 1 : nFrames
         frame_map = saliencyMap(:,:,k);
         frame_map = frame_map / max(max(frame_map));
-        [r c] = find(frame_map>0.7);
+        [r c] = find(frame_map>0.75);
         sizer = size(r);
         saliencyPoints = [saliencyPoints ; [repmat(k,sizer,1) r c]];
     end
@@ -125,8 +125,17 @@ function [opticalFlowX,opticalFlowY] = OpticalFlowMap(mov)
     opticalFlowX = zeros(vidHeight,vidWidth,nFrames);
     opticalFlowY = zeros(vidHeight,vidWidth,nFrames);
     tic;
+    
+    alpha = 0.012;
+    ratio = 0.75;
+    minWidth = 20;
+    nOuterFPIterations = 7;
+    nInnerFPIterations = 1;
+    nSORIterations = 30;
+
+    para = [alpha,ratio,minWidth,nOuterFPIterations,nInnerFPIterations,nSORIterations];
     for k = 1:nFrames-1
-        [Vx  Vy ~] = Coarse2FineTwoFrames(mov(k).cdata,mov(k+1).cdata);
+        [Vx  Vy ~] = Coarse2FineTwoFrames(mov(k).cdata,mov(k+1).cdata,para);
         opticalFlowX(:,:,k) = Vx; 
         opticalFlowY(:,:,k) = Vy; 
     end
@@ -352,71 +361,70 @@ function [videoSaliencyMap , opticalFlowMap ] = VideoSaliency(mov)
     disp('Calculating video saliency points with Nyugen...');
     tic;
     
-%     [vidHeight vidWidth ~]= size(mov(1).cdata);
-%      nFrames = length(mov);
-%     videoSaliencyMap = zeros(vidHeight , vidWidth , nFrames);
-%     
-%     H = CalculateHomography(mov); 
+    [vidHeight vidWidth ~]= size(mov(1).cdata);
+     nFrames = length(mov);
+    videoSaliencyMap = zeros(vidHeight , vidWidth , nFrames);
+    
+    H = CalculateHomography(mov); 
     [ opticalFlowMapX , opticalFlowMapY ] = OpticalFlowMap(mov);
     opticalFlowMap = cat(4,opticalFlowMapX,opticalFlowMapY);
-%     staticSaliency = StaticSaliency(mov);
-%     
-%     load('data/f_w.mat');
-% 
-%     for n = 1 : nFrames-1
-%         
-%         dynamicSaliency = sqrt( opticalFlowMapX(:,:,n) .^ 2 + opticalFlowMapY(:,:,n) .^ 2 );
-%         dynamicSaliency = dynamicSaliency/max(max(dynamicSaliency));
-%         currentStaticSaliency = staticSaliency(:,:,n)/max(max(staticSaliency(:,:,n)));
-% 
-%         Divide into patches
-%         i=1;
-%         nrPatches = floor( vidHeight / 9 )*floor( vidWidth / 9 );
-%         xy = zeros(nrPatches,2);
-%         currentFrame=zeros(vidHeight,vidWidth);
-%         
-%         for k = 1 : floor( vidHeight / 9 )
-%             for t = 1 : floor( vidWidth / 9 )
-%                 xy(i,1) = k;
-%                 xy(i,2) = t;
-% 
-%                 one   = H(1,1,n);
-%                 two   = H(1,2,n);
-%                 three = H(1,3,n);
-%                 four  = H(2,1,n);
-%                 five  = H(2,2,n);
-%                 six   = H(2,3,n);
-%                 seven = H(3,1,n);
-%                 eight = H(3,2,n);
-%                 nine  = H(3,3,n);
-%                 inputs = [ one(:)   , two(:)   , three(:) , ...
-%                            four(:)  , five(:)  , six(:)   , ...
-%                            seven(:) , eight(:) , nine(:)  , ...
-%                            xy(i,1)  , xy(i,2)]'; % input vector (6-dimensional pattern)
-%                        
-%                 wi = fi_(inputs);
-%                 wv = fv(inputs);
-%                 wi = reshape(wi,[9 9]);
-%                 wv = reshape(wv,[9 9]);
-%                 
-%                 wi = wi/(2*max(max(wi)));
-%                 wv = wv/(2*max(max(wv)));
-% 
-%                 videoSaliency = wi*currentStaticSaliency((k*9-8) : (k*9) , (t*9-8) : (t*9))  + ...
-%                     wv*dynamicSaliency((k*9-8) : (k*9) , (t*9-8) : (t*9) );
-%                 currentFrame(k*9-8:k*9,t*9-8:t*9) = videoSaliency(:,:);
-% 
-%                 i = i + 1;
-% 
-%             end
-%         end
-%         
-%         videoSaliencyMap(:,:,n) = currentFrame;
-%     end
-    load('saliencyMap.mat'); videoSaliencyMap = saliencyMap;
-    toc;
-%     save('../CAMO_Videos/Tilt/Tilt0002.avi.mat','videoSaliencyMap','-append');
-%     load('../CAMO_Videos/Tilt/Tilt0007.avi.mat','videoSaliencyMap','opticalFlowX','opticalFlowY');
+    staticSaliency = StaticSaliency(mov);
+    
+    load('data/f_w.mat');
 
+    for n = 1 : nFrames-1
+        
+        dynamicSaliency = sqrt( opticalFlowMapX(:,:,n) .^ 2 + opticalFlowMapY(:,:,n) .^ 2 );
+        dynamicSaliency = dynamicSaliency/max(max(dynamicSaliency));
+        currentStaticSaliency = staticSaliency(:,:,n)/max(max(staticSaliency(:,:,n)));
+
+%         Divide into patches
+        i=1;
+        nrPatches = floor( vidHeight / 9 )*floor( vidWidth / 9 );
+        xy = zeros(nrPatches,2);
+        currentFrame=zeros(vidHeight,vidWidth);
+        
+        for k = 1 : floor( vidHeight / 9 )
+            for t = 1 : floor( vidWidth / 9 )
+                xy(i,1) = k;
+                xy(i,2) = t;
+
+                one   = H(1,1,n);
+                two   = H(1,2,n);
+                three = H(1,3,n);
+                four  = H(2,1,n);
+                five  = H(2,2,n);
+                six   = H(2,3,n);
+                seven = H(3,1,n);
+                eight = H(3,2,n);
+                nine  = H(3,3,n);
+                inputs = [ one(:)   , two(:)   , three(:) , ...
+                           four(:)  , five(:)  , six(:)   , ...
+                           seven(:) , eight(:) , nine(:)  , ...
+                           xy(i,1)  , xy(i,2)]'; % input vector (6-dimensional pattern)
+                       
+                wi = fi_(inputs);
+                wv = fv(inputs);
+                wi = reshape(wi,[9 9]);
+                wv = reshape(wv,[9 9]);
+                
+                wi = wi/(2*max(max(wi)));
+                wv = wv/(2*max(max(wv)));
+
+                videoSaliency = wi*currentStaticSaliency((k*9-8) : (k*9) , (t*9-8) : (t*9))  + ...
+                    wv*dynamicSaliency((k*9-8) : (k*9) , (t*9-8) : (t*9) );
+                currentFrame(k*9-8:k*9,t*9-8:t*9) = videoSaliency(:,:);
+
+                i = i + 1;
+
+            end
+        end
+        
+        videoSaliencyMap(:,:,n) = currentFrame;
+        toc;
+    end
+
+    save('../lhumanite.mat','videoSaliencyMap','opticalFlowMap');
+%     load('../CAMO_Videos/Dolly/Dolly0011.avi.mat');
 end
 
