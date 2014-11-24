@@ -1,16 +1,21 @@
-function imgout = Panorama(img1,img2)
+function F = Panorama
+    F.ImagePanorama = @ImagePanorama;
+    F.MoviePanaroma = @MoviePanaroma;
+end
 
-    Util = UtilFunctions;
-    H = Util.Homography(img1,img2);
+function imgout = ImagePanorama(img1,img2)
+
+    Motion = MotionFunctions;
+    H = Motion.MyHomography(img1,img2);
    
     T = maketform('projective',H');
     [imgT, XDATA, YDATA] = imtransform(img2, T);
 %     [imgT , XDATA, YDATA] = imtransform(img2, t, 'bicubic');
 
     % Stitch images
-    [M1 N1 ~] = size(img1);
-    [M2 N2 ~] = size(img2);
-    [MT NT ~] = size(imgT);
+    [M1, N1, ~] = size(img1);
+    [M2, N2, ~] = size(img2);
+%     [MT, NT, ~] = size(imgT);
 
     % init masks
     mask1 = uint8(ones(size(img1, 1), size(img1, 2)));
@@ -87,7 +92,23 @@ function imgout = Panorama(img1,img2)
 
 end
 
-
+function [panMov] = MoviePanaroma(moviePath )
+    
+    % Read data
+    video=VideoReader(moviePath);
+    nFrames = video.NumberOfFrames;
+    frames = read(video);
+    
+    Cropper = CropFunctions;
+    frames = Cropper.RemoveBlackBars(frames);
+    
+    % Create panaroma
+    panMov = ImagePanorama(frames(:,:,:,1),frames(:,:,:,2));
+    for n = 3:20
+        panMov = ImagePanorama(panMov,mov(n).cdata);
+    end
+    
+end
 
 
 

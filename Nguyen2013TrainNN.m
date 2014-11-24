@@ -78,13 +78,6 @@ end
 
 %% TRAIN NEURAL NETWORK
 
-% load('C:\Users\ckocb_000\Thesis\bin\neuralnetworksaliency.mat');
-% load('C:\Users\ckocb_000\Thesis\bin\neuron2.mat');
-% load('C:\Users\ckocb_000\Thesis\bin\tmp.mat');
-% load('C:\Users\ckocb_000\Thesis\bin\xy.mat');
-% load('C:\Users\ckocb_000\Thesis\bin\CM.mat');
-
-clc,
 one   =CM(1,1,:);
 two   =CM(1,2,:);
 three =CM(1,3,:);
@@ -202,11 +195,8 @@ CROP =10; %the crop value will be multiplied with aspect ration to get crop wind
 CROPPINGX = CROP * RATIO(1,1);
 CROPPINGY = CROP * RATIO(1,2);
 
-UtilFunctions = Functions;
-UtilFunctions.ReadData(FolderName,FileName);
-load('Data.mat');
-mov = UtilFunctions.NewMovie(nFrames , vidHeight   ,vidWidth);
-mov = UtilFunctions.ReadMovie(mov , video , nFrames );
+video=VideoReader([folderName fileName]);
+frames = read(video);
 
 % set optical flow parameters (see Coarse2FineTwoFrames.m for the definition of the parameters)
 alpha = 0.012;
@@ -221,15 +211,15 @@ para = [alpha,ratio,minWidth,nOuterFPIterations,nInnerFPIterations,nSORIteration
 
 % Create cropped movie with cropX cropY values
 tic;
-energyMap = zeros(vidHeight,vidWidth,nFrames);
-opticalFlowMap = zeros(vidHeight,vidWidth,nFrames);
-saliencyMap = zeros(vidHeight,vidWidth,nFrames);
-grayFrames = zeros(vidHeight,vidWidth,nFrames);
+energyMap = zeros(video.Height,video.Width,video.NumberOfFrames);
+opticalFlowMap = zeros(video.Height,video.Width,video.NumberOfFrames);
+saliencyMap = zeros(video.Height,video.Width,video.NumberOfFrames);
+grayFrames = zeros(video.Height,video.Width,video.NumberOfFrames);
 
 
-for n = 1 : nFrames-1
-    im1 = mov(n).cdata;
-    im2 = mov(n+1).cdata;
+for n = 1 : video.NumberOfFrames-1
+    im1 = frames(:,:,:,n);
+    im2 = frames(:,:,:,n+1);
     [vx,vy,warpI2] = Coarse2FineTwoFrames(im1,im2,para);
     toc;
     dynamicSaliency = sqrt(vx.^2+vy.^2);
@@ -249,12 +239,12 @@ for n = 1 : nFrames-1
     currentPatch = [];
     % Divide into patches
     i=1;
-    nrPatches = floor( vidHeight / 90 )*floor( vidWidth / 90 );
+    nrPatches = floor( video.Height / 90 )*floor( video.Width / 90 );
     xyTest = zeros(nrPatches,2);
     CM = zeros(3,3,nrPatches);
-    currentFrame=zeros(vidHeight,vidWidth);
-    for k = 1 : floor( vidHeight / 90 )
-        for t = 1 : floor( vidWidth / 90 )
+    currentFrame=zeros(video.Height,video.Width);
+    for k = 1 : floor( video.Height / 90 )
+        for t = 1 : floor( video.Width / 90 )
             xyTest(i,1) = k;
             xyTest(i,2) = t;
             CM(:,:,i) = h;
@@ -291,5 +281,5 @@ for n = 1 : nFrames-1
     toc;  
 end
 
-save(strcat(FolderName,FileName,'.mat'),'grayFrames','energyMap','saliencyMap','dynamicSaliency');
+% save(strcat(FolderName,FileName,'.mat'),'grayFrames','energyMap','saliencyMap','dynamicSaliency');
 

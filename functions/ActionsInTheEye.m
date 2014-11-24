@@ -1,35 +1,17 @@
-function F = ReadFunctions
-    F.ReadData = @ReadData;
+function F = ActionsInTheEye
     F.ReadEyeTrackingData = @ReadEyeTrackingData;
-    F.ReadMovie = @ReadMovie;
-    F.NewMovie = @NewMovie;
-    
+    F.CalculateMapping = @CalculateMapping;
 end
 
+function valueSet = ReadEyeTrackingData(moviePath)
 
-%% PUBLIC FUNCTIONS
-
-function [video,nFrames,vidHeight,vidWidth,vidFPS,vidDuration,frames] = ReadData( foldername,filename )
-
-    % Read video
-    video       = VideoReader( strcat(foldername, filename ) );
-    lastFrame = read(video, inf);
-    nFrames     = video.NumberOfFrames;
-    vidHeight   = video.Height;
-    vidWidth    = video.Width;
-    vidFPS      = video.FrameRate;
-    vidDuration = video.Duration;
-    frames      = read(video);
-    
-end
-
-function valueSet = ReadEyeTrackingData(filename,foldername)
-
-    if regexp( foldername, '.*ucf.*') 
+    if regexp( moviePath, '.*ucf.*') 
         gazeFolder = 'gaze_ucfsa';
-        regexResult = regexp(filename,'/','split');
-        filename = strcat(regexResult{1},'_',regexResult{2},'.avi');
-    elseif regexp (foldername , '.*Hollywood.*' )
+        regexResult = regexp(moviePath,'\','split');
+        filename = [regexResult{end-2} '_' regexResult{end-1} '.avi'];
+    elseif regexp (moviePath , '.*Hollywood.*' )
+        regexResult = regexp(moviePath,'\','split');
+        filename = regexResult{end};
         gazeFolder  = 'gaze_hollywood2';
     end
    
@@ -91,13 +73,33 @@ function valueSet = ReadEyeTrackingData(filename,foldername)
     
 end
 
-function [mov] = ReadMovie( mov , video )
-    nFrames = length(mov);
-    for k = 1 : nFrames
-        mov(k).cdata = read(video, k);    
-    end
-end
+function eyes = CalculateMapping(mappingStruct)
 
-function [mov] = NewMovie(nFrames , vidHeight   ,vidWidth )
-    mov( 1 : floor( nFrames ))= struct('cdata',zeros(vidHeight   ,vidWidth   , 3,'uint8'),'colormap',[]);
+    videoResX  = mappingStruct.videoResX;
+    videoResY  = mappingStruct.videoResY;
+    screenResX = mappingStruct.screenResX;
+    screenResY = mappingStruct.screenResY;
+    xScreen    = mappingStruct.xScreen;
+    yScreen    = mappingStruct.yScreen;
+    timeStamp  = mappingStruct.timeStamp;
+    vidDuration= mappingStruct.vidDuration;
+    nFrames    = mappingStruct.nFrames;
+
+    a           = double( videoResX ) / double( screenResX ) ; 
+    b           = ( double( screenResY ) - double( videoResY ) / a ) / 2;
+    eyes = [];
+    for subjectNumber = 1:19
+        xHeight     = a * xScreen{subjectNumber};
+        yHeight     = a * ( yScreen{subjectNumber} - b );
+        frames      = int32(round( nFrames * double(timeStamp{subjectNumber}) / ( vidDuration * 1000000 ) )) +1;
+        eyes        = [ eyes; repmat(subjectNumber,size(frames)) frames yHeight xHeight];
+    end
+
+    eyes = eyes( eyes(:,2) <= nFrames & ...
+                 eyes(:,3) > 1 & ...
+                 eyes(:,3) < videoResY & ...
+                 eyes(:,4) > 1 & ...
+                 eyes(:,4) < videoResX,: );
+%     eyes = sortrows(eyes,1);
+
 end

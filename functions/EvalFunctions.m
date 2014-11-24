@@ -1,6 +1,7 @@
 function F = EvalFunctions
     F.CalculateAUCscoreFrame = @CalculateAUCscoreFrame;
     F.CalculateAUCscoreVideo = @CalculateAUCscoreVideo;
+    F.ReadRValuesFromFiles = @ReadRValuesFromFiles;
 end
 
 function [ score , R ] = CalculateAUCscoreVideo( framesSaliency, framesFixation,algorithm )
@@ -86,5 +87,17 @@ function [ score , R ] = CalculateAUCscoreFrame( salMap, eyeMap, shufMap, numRan
     
 end
 
+function [score,totalR] = ReadRValuesFromFiles(algorithm)
 
+    totalR = zeros(12,2);
+    for k = 100:100:2000
+        R = [];
+        load(strcat('data\R_',algorithm,'_',num2str(k),'.mat'));
+        totalR = totalR + R;
+    end
+    
+    totalR = totalR / 2000;
+    score = trapz(flipdim(totalR(:,1),1),flipdim(totalR(:,2),1));
+    
+end
 

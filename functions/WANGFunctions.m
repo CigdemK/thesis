@@ -7,55 +7,48 @@ end
 % % Public Functions
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function scaledPathlines = PerFrameOptimization(FolderName, FileName, newsize)
+function scaledPathlines = PerFrameOptimization(moviePath, newsize)
 
-%     TimerScript;
-%     
-% %     Read input movie
-%     Reader = ReadFunctions;
-%     Cropper = CropFunctions;
-%     [video,nFrames,vidHeight,vidWidth,vidFPS,frames] = Reader.ReadData(FolderName,FileName);
-%     mov = Reader.NewMovie(nFrames, vidHeight,vidWidth);
-%     mov = Reader.ReadMovie(mov,video);
-%     
-% %     Remove black bars and adjust the size parameters
-%     movNoBars = Cropper.RemoveBlackBars(mov);
-%     [vidHeight,vidWidth,~] = size(movNoBars(1).cdata);
-%     
-% % Step 1: Apply Scale&Stretch to all frames
-%     tic;
-%     originalFrames = zeros(vidHeight,vidWidth,3,nFrames);
-%     scaledFrames = zeros(newsize(1),newsize(2),3,nFrames);
-%     gridX = zeros(ceil(vidHeight/50),ceil(vidWidth/50),nFrames);
-%     gridY = zeros(ceil(vidHeight/50),ceil(vidWidth/50),nFrames);
-%     for k = 1:nFrames
-%         originalFrames(:,:,:,k) = im2double(movNoBars(k).cdata);
-%         [tmp, gridX(:,:,k), gridY(:,:,k)]= ScaleStretch(movNoBars(k).cdata,newsize);
-%         scaledFrames(:,:,:,k) = im2double(tmp);
-%     end
-%     toc;
-%     
-% % Step 2: Calculate pathlines, adjacency and correspondance
-% 
-%     originalPathlines   = GetPathlines( originalFrames, [vidHeight/20 vidWidth/20] ); toc;
-%     scaledPathlines     = GetPathlines( scaledFrames, [vidHeight/20 vidWidth/20] ); toc;
-% 
-%     originalAdjacencies = CalculateAdjacencies(originalPathlines); toc;
-%     scaledAdjacencies   = CalculateAdjacencies(scaledPathlines);  toc;
-% 
-%     correspondances = GetCorrespondances(gridX, gridY, originalPathlines, scaledPathlines, [vidHeight,vidWidth] );
-  
-%     save('tmp.mat'); 
-%     load('tmp.mat');
-%     originalPathlines = originalPathlines(correspondances(:,1),:,:);
-%     scaledPathlines = scaledPathlines(correspondances(:,2),:,:);  
-%     originalAdjacencies = CalculateAdjacencies(originalPathlines);
-% % % Step 3: Optimize Scaling with the Pathlines   
-%     
-%     originalPathlines = permute(originalPathlines , [2 1 3]);
-%     scaledPathlines = permute(scaledPathlines , [2 1 3]);
+    video = VideoReader( moviePath );
+    frames = read(video);
     
-    load('tmp.mat');
+% frames = frames(:,:,:,1:5);
+% nFrames = 5;
+    
+%   Remove black bars and adjust the size parameters
+    Cropper = CropFunctions;
+    movNoBars = Cropper.RemoveBlackBars(frames);
+    [vidHeight,vidWidth,~,nFrames] = size(frames);
+    
+% Step 1: Apply Scale&Stretch to all frames
+    tic;
+    originalFrames = zeros(vidHeight,vidWidth,3,nFrames);
+    scaledFrames = zeros(newsize(1),newsize(2),3,nFrames);
+    gridX = zeros(ceil(vidHeight/50),ceil(vidWidth/50),nFrames);
+    gridY = zeros(ceil(vidHeight/50),ceil(vidWidth/50),nFrames);
+    for k = 1:nFrames
+        originalFrames(:,:,:,k) = im2double(movNoBars(k).cdata);
+        [tmp, gridX(:,:,k), gridY(:,:,k)]= ScaleStretch(movNoBars(k).cdata,newsize);
+        scaledFrames(:,:,:,k) = im2double(tmp);
+    end
+    toc;
+    
+% Step 2: Calculate pathlines, adjacency and correspondance
+
+    originalPathlines   = GetPathlines( originalFrames, [vidHeight/20 vidWidth/20] ); toc;
+    scaledPathlines     = GetPathlines( scaledFrames, [vidHeight/20 vidWidth/20] ); toc;
+
+    correspondances = GetCorrespondances(gridX, gridY, originalPathlines, scaledPathlines, [vidHeight,vidWidth] );
+    toc;
+    originalPathlines = originalPathlines(correspondances(:,1),:,:); 
+    scaledPathlines = scaledPathlines(correspondances(:,2),:,:);   
+    originalAdjacencies = CalculateAdjacencies(originalPathlines); toc;
+    
+ % Step 3: Optimize Scaling with the Pathlines   
+    
+    originalPathlines = permute(originalPathlines , [2 1 3]);
+    scaledPathlines = permute(scaledPathlines , [2 1 3]);
+    
     nCorrespondances = size(correspondances,1);
     S = ones(4,nCorrespondances) ;%+ 0.1* rand(4,nCorrespondances);
     t = zeros(2,nCorrespondances) ;%+ 0.1* rand(2,nCorrespondances);
@@ -86,10 +79,9 @@ function scaledPathlines = PerFrameOptimization(FolderName, FileName, newsize)
                    (-1)*t(:,adjacencyIndices(j));...
                    (-1)*Sij(:,adjacencyIndices(j))];
             end
-%             tic;
+
             option = optimset('Display','off','LargeScale','off','Algorithm','interior-point');
             optimalS = fminunc(f,currentS,option);
-%             toc;
             
             S(:,i) = optimalS(1:4);
             t(:,i) = optimalS(5:6);
@@ -102,11 +94,19 @@ function scaledPathlines = PerFrameOptimization(FolderName, FileName, newsize)
         toc;
     end
 
-
 end
 
-function [imgOut, meshXNew , meshYNew]= ScaleStretch(imgIn, newsize)
+function [imgOut, meshXNew , meshYNew]= ScaleStretch(imgIn, newsize, meshsize)
 
+    [height, width, ~] = size(imgIn);
+    if nargin < 3
+        cellsize(1) = 50;
+        cellsize(2) = 50;
+    else
+        cellsize(1) = height/meshsize(1);
+        cellsize(2) = width/meshsize(2);
+    end
+    
     % Compute significance map
     Wb = gbvs(imgIn);
     [Gx,Gy] = imGradient(double(imgIn(:,:,1)));
@@ -114,8 +114,7 @@ function [imgOut, meshXNew , meshYNew]= ScaleStretch(imgIn, newsize)
     W = mat2gray(Wa.*Wb.master_map_resized);
 
     % Construct the mesh grid
-    [height width ~] = size(imgIn);
-    [meshX,meshY] = meshgrid(1:50:width,1:50:height);
+    [meshX,meshY] = meshgrid(1:cellsize(2):width,1:cellsize(1):height);
     meshX(:,end) = width;
     meshY(end,:) = height;
         
@@ -242,7 +241,8 @@ function [pathlines] = GetPathlines(frames , meshSize)
     [vidHeight , vidWidth, ~, nFrames] = size(frames);
     
     % Calculate optical flow
-    [Vx, Vy] = CalculateOpticalFlow(frames);
+    Motion = MotionFunctions;
+    [Vx, Vy] = Motion.MyOpticalFlow(frames);
 %     load('tmp2_gooddouble.mat');
 %     save('tmp2_gooddouble.mat','Vx','Vy');
     
@@ -273,8 +273,8 @@ function [pathlines] = GetPathlines(frames , meshSize)
         meshY(:,:,k) = meshY(:,:,k-1) + yPts;
         
         % Find terminated paths that exceeds frame size
-        [indXr indXc] = find( meshX(:,:,k)<1 | meshX(:,:,k)>vidWidth );
-        [indYr indYc] = find( meshY(:,:,k)<1 | meshY(:,:,k)>vidHeight );
+        [indXr, indXc] = find( meshX(:,:,k)<1 | meshX(:,:,k)>vidWidth );
+        [indYr, indYc] = find( meshY(:,:,k)<1 | meshY(:,:,k)>vidHeight );
         
         allRows     = [indXr;indYr];
         allColumns  = [indXc;indYc];
@@ -333,27 +333,6 @@ function [pathlines] = GetPathlines(frames , meshSize)
     
 end
 
-function [Vx, Vy] = CalculateOpticalFlow(frames)
-    
-    [vidHeight , vidWidth, ~, nFrames] = size(frames);
-    
-    Vx = zeros(vidHeight,vidWidth,nFrames);
-    Vy = zeros(vidHeight,vidWidth,nFrames);
-    
-    for k = 1:nFrames-1
-        [VxTmp, VyTmp, ~] = Coarse2FineTwoFrames(frames(:,:,:,k),frames(:,:,:,k+1));
-        Vx(:,:,k) = VxTmp;
-        Vy(:,:,k) = VyTmp;
-    end
-    
-    Vx(:,:,end) = Vx(:,:,end-1);
-    Vy(:,:,end) = Vy(:,:,end-1);
-    
-    Vx = Vx.*50;
-    Vy = Vy.*50;
-    
-end
-
 function [adjacencies] = CalculateAdjacencies(pathlines)
 
     adjacencies = [];
@@ -397,8 +376,8 @@ function [correspondances] = GetCorrespondances(meshXWarped , meshYWarped , ...
         
         timeSliceOriginal = originalPathlines(:,:,k);
         timeSliceScaled = scaledPathlines(:,:,k);
-        indOriginal = 1:size(timeSliceOriginal,1);
-        indScaled = 1:size(timeSliceScaled,1);
+%         indOriginal = 1:size(timeSliceOriginal,1);
+%         indScaled = 1:size(timeSliceScaled,1);
         
         currentCorr = GetCorrespondancesPerFrame(meshXWarped(:,:,k) , meshYWarped(:,:,k),...
             timeSliceOriginal , timeSliceScaled , originalSize);
@@ -429,8 +408,8 @@ function [correspondances] = GetCorrespondancesPerFrame(meshXWarped , meshYWarpe
         meshX(:,end) = double(n);
         meshY(end,:) = double(m);
 
-        newCoordsX = interp2( meshX, meshY, meshXWarped, xRegularSmall, yRegularSmall, 'cubic');
-        newCoordsY = interp2( meshX, meshY, meshYWarped, xRegularSmall, yRegularSmall, 'cubic');
+        newCoordsX = interp2( meshX, meshY, meshXWarped, xRegularSmall, yRegularSmall, 'spline');
+        newCoordsY = interp2( meshX, meshY, meshYWarped, xRegularSmall, yRegularSmall, 'spline');
 
         pathlinesOriginal(:,1) = ceil( pathlinesOriginal(:,1) * ( double(n) / originalSize(2) ) );
         pathlinesOriginal(:,2) = ceil( pathlinesOriginal(:,2) * ( double(m) / originalSize(1) ) );
@@ -558,22 +537,21 @@ function warpedImage = WarpImageWithMesh(imgIn , meshX , meshY )
     imgIn = imresize(imgIn,[m,n]);
 
     [xRegular,yRegular] = meshgrid(double(1:n),double(1:m));
-    [meshXRegular,meshYRegular] = meshgrid( 1 : ceil( double(n/int32(X)) ) : double(n) , ...
-                                            1 : ceil( double(m/int32(Y)) ) : double(m) );
+    [meshXRegular,meshYRegular] = meshgrid( 1 : ceil( double(n)/X) : double(n) , ...
+                                            1 : ceil( double(m)/Y) : double(m) );
     meshXRegular(:,end) = double(n);
     meshYRegular(end,:) = double(m);
     
-    newCoordsX = interp2( meshXRegular, meshYRegular, meshX, xRegular, yRegular, 'cubic');
-    newCoordsY = interp2( meshXRegular, meshYRegular, meshY, xRegular, yRegular, 'cubic');
+    newCoordsX = interp2( meshXRegular, meshYRegular, meshX, xRegular, yRegular, 'spline');
+    newCoordsY = interp2( meshXRegular, meshYRegular, meshY, xRegular, yRegular, 'spline');
     
-    warped1 = interp2( xRegular, yRegular, imgIn(:,:,1), newCoordsX, newCoordsY, 'cubic');
-    warped2 = interp2( xRegular, yRegular, imgIn(:,:,2), newCoordsX, newCoordsY, 'cubic');
-    warped3 = interp2( xRegular, yRegular, imgIn(:,:,3), newCoordsX, newCoordsY, 'cubic');
+    warped1 = interp2( xRegular, yRegular, im2double(imgIn(:,:,1)), newCoordsX, newCoordsY, 'spline');
+    warped2 = interp2( xRegular, yRegular, im2double(imgIn(:,:,2)), newCoordsX, newCoordsY, 'spline');
+    warped3 = interp2( xRegular, yRegular, im2double(imgIn(:,:,3)), newCoordsX, newCoordsY, 'spline');
     
     warpedImage = uint8(cat(3,warped1,warped2,warped3));
 
 end
-
 
 function PlotPathlines(originalPathlines,scaledPathlines,stepSize,...
     correspondances,originalAdjacencies,scaledAdjacencies , originalSize , scaledSize)

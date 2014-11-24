@@ -1,12 +1,12 @@
 function F = CropFunctions
-    F.EstimateWindowSize = @EstimateWindowSize;
-    F.CreateWindow = @CreateWindow;
+    F.EstimateCropWindowSize = @EstimateCropWindowSize;
+    F.CreateCropWindow = @CreateCropWindow;
     F.RemoveBlackBars = @RemoveBlackBars;
 end
 
-%% PUBLIC FUNCTIONS
+% PUBLIC FUNCTIONS
 
-function [crop] = EstimateWindowSize(avgFlow, eyes , shotBoundaries ,minSize , ratio , maxSize)
+function [crop] = EstimateCropWindowSize(avgFlow, eyes , shotBoundaries ,minSize)
  
     crop = [];
     nrShots = length(shotBoundaries)-1;
@@ -43,7 +43,7 @@ function [crop] = EstimateWindowSize(avgFlow, eyes , shotBoundaries ,minSize , r
     crop = [crop; crop(length(crop),:)];
 end
 
-function [croppedX,croppedY] = CreateWindow( limX , limY , avg , vidWidth , vidHeight)
+function [croppedX,croppedY] = CreateCropWindow( limX , limY , avg , vidWidth , vidHeight)
     
     croppedX = [];
     croppedY = [];
@@ -53,10 +53,6 @@ function [croppedX,croppedY] = CreateWindow( limX , limY , avg , vidWidth , vidH
         maxX = floor( avg( k , 1)) + limX(k) ;
         minY = floor( avg( k , 2)) - limY(k) ;
         maxY = floor( avg( k , 2)) + limY(k) ;
-        
-%         if minX <= 0 || maxX > vidWidth || minY <= 0 || maxY > vidHeight
-%             continue;
-%         end
         
         if minX <= 0 
             minX = 1;
@@ -74,22 +70,20 @@ function [croppedX,croppedY] = CreateWindow( limX , limY , avg , vidWidth , vidH
             maxY = vidHeight ;
             minY = vidHeight - ( 2 * limY(k));
         end
-        croppedX = [croppedX ; [minX maxX] ];
-        croppedY = [croppedY ; [minY maxY] ];
+        croppedX = [croppedX ; round([minX maxX]) ];
+        croppedY = [croppedY ; round([minY maxY]) ];
     end
     
 end
 
-function [mov] = RemoveBlackBars(mov)
-    
-    nFrames = length(mov);
-    [vHeight vWidth vDepth] = size(mov(1).cdata);
-%     blackBar = zeros(1,vWidth,3);
+function [frames] = RemoveBlackBars(frames)
+
+    [vHeight, vWidth, vDepth, nFrames] = size(frames);
     indices = [];
     
     % Detect the rows to be removed
     for j = 1:vHeight
-        line = mov(1).cdata(j,:,:);
+        line = frames(:,:,:,1);
         if (length(line(line(1,:,:)<20)) == vWidth*vDepth)
             indices = [indices;j];   
         end
@@ -97,11 +91,11 @@ function [mov] = RemoveBlackBars(mov)
     
     % Remove rows from all frames
     for n = 1:nFrames
-        mov(n).cdata(indices,:,:) = [];
+        frames(indices,:,:,n) = [];
     end
 end
 
-%% PRIVATE FUNCTIONS
+% PRIVATE FUNCTIONS
 
 function [crop] = ChangeCropSize( extremes , center , minSize , ratio , maxSize)
     X = extremes(1,:);

@@ -1,11 +1,10 @@
 function F = UtilFunctions
     F.CheckIsInside = @CheckIsInside;
-    F.PlotTrajectory2D = @PlotTrajectory2D;
-    F.PlotTrajectory3D = @PlotTrajectory3D;
-    F.CalculateMapping = @CalculateMapping;
-    F.Homography = @Homography;
-    F.peakfinder = @peakfinder;
-    F.flattenCellArray = @flattenCellArray;
+    F.PeakFinder = @PeakFinder;
+    F.FlattenCellArray = @FlattenCellArray;
+    F.MyGauss = @MyGauss;
+    F.MyHistMatch = @MyHistMatch;
+    F.DetectShotBoundaries = @DetectShotBoundaries;
 end
 
 function [bool] = CheckIsInside(center , minSize , point , maxSize)
@@ -22,93 +21,30 @@ function [bool] = CheckIsInside(center , minSize , point , maxSize)
     end
 end
 
-function PlotTrajectory2D( data , fitPower )
-    x = double(data( : , 1 ));
-    y = double(data( : , 2 ));
-%     p = polyfit( x , y , fitPower );
-%     plotx= linspace( min(x) , max(x));
-%     hold on;
-    c = jet(98);
-    scatter(x,y,50,c);    
-    hold on;
-%     ploty = polyval( p , plotx );
-%     plot(plotx, ploty, '-');
-    axis([250 350 200 300]);
-    hold on;
+function [shotBoundaries] = DetectShotBoundaries( frames ) 
+
+    nrFrames = size(frames,4);
+    previous = imhist(mat2gray(frames(:,:,1,1)));
     
-%     labels = {'10th frame','20th frame','30th frame','40th frame','10th frame','20th frame','30th frame','40th frame','10th frame','20th frame'};
-    a = colorbar;
-    set(gca, 'CLim', [1, 98]);
-    set(a, 'YTick', 1:10:98); 
-    set(a, 'YTickLabel', {'1st Frame','10th Frame','20th Frame','30th Frame','40th Frame','50th Frame','60th Frame','70th Frame','80th Frame','90th Frame'});
-    xlabel('Frame Width');
-    ylabel('Frame Height');
-    hold off;
-end
-
-function PlotTrajectory3D( data )
-    figure;
-    x = data( : , 1 );
-    y = data( : , 2 );
-    sizeD = length(data);
-    plot3( x , y , 1:sizeD); % do a 3d trajectory mapping
-    hold on;
-    plot3( x , y , 1:sizeD, 'x' ); 
-    hold off;
-end
-
-% output: eyes = [subjectNr, frameNr, y, x]
-function eyes = CalculateMapping(mappingStruct)
-
-    videoResX  = mappingStruct.videoResX;
-    videoResY  = mappingStruct.videoResY;
-    screenResX = mappingStruct.screenResX;
-    screenResY = mappingStruct.screenResY;
-    xScreen    = mappingStruct.xScreen;
-    yScreen    = mappingStruct.yScreen;
-    timeStamp  = mappingStruct.timeStamp;
-    vidDuration= mappingStruct.vidDuration;
-    nFrames    = mappingStruct.nFrames;
-    
-    a           = double( videoResX ) / double( screenResX ) ; 
-    b           = ( double( screenResY ) - double( videoResY ) / a ) / 2;
-    eyes = [];
-    for subjectNumber = 1:19
-        xHeight     = a * xScreen{subjectNumber};
-        yHeight     = a * ( yScreen{subjectNumber} - b );
-        frames      = int32(round( nFrames * double(timeStamp{subjectNumber}) / ( vidDuration * 1000000 ) )) +1;
-        eyes        = [ eyes; repmat(subjectNumber,size(frames)) frames yHeight xHeight];
+    for k = 2 : nrFrames
+        current = imhist(mat2gray(frames(:,:,1,k)));
+        diff = abs(current-previous);
+        absDiff(k) = sum(diff(1));
+        previous = current;
     end
     
-    eyes = eyes( eyes(:,2) <= nFrames & ...
-                 eyes(:,3) > 1 & ...
-                 eyes(:,3) < videoResY & ...
-                 eyes(:,4) > 1 & ...
-                 eyes(:,4) < videoResX,: );
-%     eyes = sortrows(eyes,1);
-
+    shotBoundaries = PeakFinder(absDiff , 6*mean(absDiff));
+    
+    if isempty(shotBoundaries)
+        shotBoundaries = [1;nrFrames];
+    elseif shotBoundaries(size(shotBoundaries)) ~= nrFrames
+        shotBoundaries = [1;shotBoundaries';nrFrames];
+    else
+        shotBoundaries = [1;shotBoundaries'];
+    end
 end
 
-function [ H ] = Homography(img1,img2)
-% Maps the points in the second image to the first image.
-% Returns the homography matrix of img1-->img2
-
-    I = single(rgb2gray(img1));
-    J = single(rgb2gray(img2));
-      
-    % Apply SIFT and find matching points
-    [features1,distances1] = vl_sift(I);
-    [features2,distances2] = vl_sift(J);
-    [matches ~] = vl_ubcmatch(distances1,distances2,5);
-
-    % Find transformation matrix and apply transformation
-    H = findHomography( ...
-         [features1( 1 , matches( 1 , : ) ) ; features1( 2 , matches( 1 , : ) ) ],...
-         [features2(1 , matches( 2 , : ));features2( 2 , matches( 2 , : ) ) ]);
-
-end
-
-function varargout = peakfinder(x0, sel, thresh, extrema, include_endpoints)
+function varargout = PeakFinder(x0, sel, thresh, extrema, include_endpoints)
     %PEAKFINDER Noise tolerant fast peak finding algorithm
     %   INPUTS:
     %       x0 - A real vector from the maxima will be found (required)
@@ -363,7 +299,7 @@ function varargout = peakfinder(x0, sel, thresh, extrema, include_endpoints)
     end
 end
 
-function C = flattenCellArray(A)
+function C = FlattenCellArray(A)
 
     C = {};
     for i=1:numel(A)  
@@ -375,5 +311,24 @@ function C = flattenCellArray(A)
 
         end
     end
-    
+
 end
+
+function f = MyGauss(vidHeight, vidWidth, sigma, centerx, centery)
+
+    [x y]=meshgrid( round(-vidWidth/2)+1:round(vidWidth/2), ...
+                    round(-vidHeight/2)+1:round(vidHeight/2));
+
+    f = exp( ( -(x-centerx).^2 / (2*sigma^2) ) + ...
+           ( -(y-centery).^2 / (2*sigma^2) ) )  ;
+    f = f./sum(f(:));
+
+end
+
+function outputImage = MyHistMatch(inputImage, targetImage)
+
+    [c,x] = imhist(targetImage); 
+    outputImage = histoMatch(inputImage, c, x);
+
+end
+
