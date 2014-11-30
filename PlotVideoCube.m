@@ -4,9 +4,10 @@ fileName = 'actioncliptest00001.avi'; %_ImprovedTrajectoriesSaliencyMap.mat
 shotStart = 48;
 shotEnd = 95;
 
+%% Init
 video=VideoReader([folderName fileName]);
 frames = read(video);
-frames = frames(:,:,:,shotStart:shotEnd);
+% frames = frames(:,:,:,shotStart:shotEnd);
 [height,width,~,nFrames] = size(frames);
 
 tic;
@@ -14,87 +15,36 @@ regexres = regexp(fileName,'.avi','split');
 load([folderName regexres{1} '\ImprovedTrajectoryOriginalTJS.mat'])
 toc;
 
-% Try grouping neighbour trajectories
+%% Group trajectories with the mean distance manually
+
+% % Group trajectories according to their starting frame
 % accordingToStart = cell(nFrames,1);
 % for i = 1:nFrames; accordingToStart{i} = []; end
-forKMeans = zeros(size(trajectories,1),5); %[meanX,meanY,firstD,secondD]
-correspondance = zeros(size(trajectories,1),2);
-kMeansIndex = 1;
-for k = 1:size(trajectories,1)
-    
-    currentTrajectory = trajectories{k};
-    
-    trajectoryLength = size(currentTrajectory.trajectory,2);
-    trajectoryEnd = currentTrajectory.frameNum;
-    trajectoryStart = trajectoryEnd - trajectoryLength + 1;
-
-    if trajectoryStart > shotStart && trajectoryEnd < shotEnd   
-        tr = currentTrajectory.trajectory;
-        forKMeans(k,:) = dtw_c(tr(1,:),tr(2,:));
-%         X = fft(tr(1,:));
-%         Y = fft(tr(2,:));
-     
-%         currentTrajectory.distance = sqrt(tr(1,:).^2 + tr(2,:).^2);
-%         meanDistance = mean(currentTrajectory.distance);
-%         p = polyfit(1:trajectoryLength,currentTrajectory.distance,3);
-%         pd = polyder(p);
-%         pdd = polyder(pd);
-            
-%         forKMeans(kMeansIndex,:) = [real(X(1)),real(Y(1))];  
-%         forKMeans(kMeansIndex,:) = [pd,pdd]; 
-%         kMeansIndex = kMeansIndex + 1;
-%         correspondance(kMeansIndex,:) = [kMeansIndex,k];
-%     else
-%         forKMeans(k,:) = [0,0,0,0,0,0,0,0];
-    end
-    
-%     if trajectoryStart > shotStart && trajectoryEnd < shotEnd
-%         accordingToStart{trajectoryStart - shotStart}(end+1) = k;
-%     end
-
-end
-forKMeans(~any(forKMeans,2),:) = [];
-correspondance(~any(correspondance,2),:) = [];
-toc;
-
-
-GROUP_NUMBER = 15;
-params = kmeans(forKMeans,GROUP_NUMBER);
-groups = params(end).classes;
-toc;
-
-% Plot trajectory groups in different colors
-colorArr = {'b','g','k','r','m','c','y'};   
-for k = 1:50:size(trajectories,1)
-
-    currentTrajectory = trajectories{k};
-    tr = currentTrajectory.trajectory;
-    trajectoryLength = size(currentTrajectory.trajectory,2);
-    trajectoryEnd = currentTrajectory.frameNum;
-    trajectoryStart = trajectoryEnd - trajectoryLength + 1;
-    
-    if trajectoryStart < shotStart || trajectoryEnd > shotEnd; continue; end
-    
-    trGroup = groups(k);
-    hold on;
-%     mod(trGroup,7)+1
-    plot3(tr(2,:),(trajectoryStart-1):(trajectoryEnd-1),tr(1,:),[colorArr{mod(trGroup,7)+1}]);
- 
-end
-axis tight;
-view(3);
-toc;
-
-% ADJACENCY_DISTANCE = 20;
+% for k = 1:size(trajectories,1)
+%     
+%     currentTrajectory = trajectories{k};
+%     
+%     trajectoryLength = size(currentTrajectory.trajectory,2);
+%     trajectoryEnd = currentTrajectory.frameNum;
+%     trajectoryStart = trajectoryEnd - trajectoryLength + 1;
+%     
+%     accordingToStart{trajectoryStart}(end+1) = k;
+% 
+% end
+% toc;
+% 
+% % Find adjacent trajectories
+% ADJACENCY_DISTANCE = 10;
 % adjacencies = zeros(100000,2);
-% adjacencies(1,1) = 2; % keep the last row
-% for k = 1:size(accordingToStart,1)
+% adjacencies(1,1) = 2; % keep the last index in the first element
+% for k = 1:nFrames
+%     
 %     currentStart = accordingToStart{k};
-%     for i = 1:97:size(currentStart,2)
+%     for i = 1:50:size(currentStart,2)
 %         
 %         traji = trajectories{currentStart(i)}.trajectory; 
 %         
-%         % Chech trajectories starting from the same frame
+%         % Check trajectories starting from the same frame
 %         for j = i+1:size(currentStart,2)
 %             trajj = trajectories{currentStart(j)}.trajectory;
 %             distance = abs(mean(traji(2,:) - trajj(2,:)));
@@ -104,7 +54,7 @@ toc;
 %             end
 %         end
 % 
-%         % Chech trajectories starting from the -1 frame
+%         % Check trajectories starting from the -1 frame
 %         if k > 1
 %             possibleStart = accordingToStart{k-1};
 %             for t = 1:size(possibleStart,2)
@@ -117,11 +67,9 @@ toc;
 %             end
 %         end
 %     end
-% %     toc;
-% end
-% toc;
-%   
+% end 
 % adjacencies(~any(adjacencies,2),:) = []; % remove zero rows
+% toc;
 % 
 % % Group adjacent trajectories
 % GROUP_NUMBER = 1000;
@@ -168,35 +116,11 @@ toc;
 %     adjacencies(rowind,:)=[];
 % 
 % end
+% groups(:,~any(groups,1)) = [];  % Remove all zero columns
 % toc;
-% 
-% 
-% % Remove all zero columns
-% groups(:,~any(groups,1)) = []; 
-% toc;
-% % Plot trajectory groups in different colors
-% colorArr = {'b','g','k','r','m','c','y'};   
-% for k = 1:size(groups,2)
-% 
-%     currentIndices = groups(:,k);
-%     currentIndices(~any(currentIndices,2),:) = [];  %remove zero rows
-%     if size(currentIndices,1) < 1000; continue; end
-%     
-%     for i = 1:100: size(currentIndices)
-%         currentTrajectory = trajectories{currentIndices(i)};
-%         tr = currentTrajectory.trajectory;
-%         trajectoryLength = size(tr,2);
-%         trajectoryEnd = currentTrajectory.frameNum;
-%         trajectoryStart = trajectoryEnd - trajectoryLength + 1;
-%         hold on;
-%         plot3(tr(2,:),(trajectoryStart-1):(trajectoryEnd-1),tr(1,:),[colorArr{mod(k,7)+1}]);
-%     end
-%     
-% end
-% % axis equal;
-% view(3);
-% 
-% % Plot video cube
+
+%% Plot video cube
+
 % figure;
 % imgSaliency = ImageSaliency;
 % saliencyMapFixations = imgSaliency.ActionsInTheEyeFixation([folderName fileName]);
@@ -211,8 +135,9 @@ toc;
 %     axis equal;
 %     view(3);
 % end
-% 
-% Plot trajectories
+
+%% Plot all trajectories
+
 % for k = 1:100:size(trajectories,1)
 % 
 %     currentTrajectory = trajectories{k};
@@ -228,8 +153,9 @@ toc;
 % %     plot3(tr(2,:),(trajectoryStart-1)*10:10:(trajectoryEnd-1)*10,tr(1,:),'r')
 %     plot(tr(2,:),(trajectoryStart-1)*10:10:(trajectoryEnd-1)*10,'x')
 % end
-% 
-% % Plot trajectory saliency and fixation saliency
+
+%% Plot trajectory saliency and fixation saliency
+
 % % imgSaliency = ImageSaliency;
 % % saliencyMap = imgSaliency.Cigdem([folderName fileName],trajectoriesByFrame);
 % saliencyMapFixations = imgSaliency.ActionsInTheEyeFixation([folderName fileName]);
@@ -261,3 +187,93 @@ toc;
 %     Faces = imresize(Faces, [height,width]);
 %     imshow(Faces);
 % end
+
+
+%% Try grouping trajectories with kmeans
+
+forKMeans = zeros(size(trajectories,1),6); %[meanX,meanY,firstD,secondD]
+for k = 1:size(trajectories,1)
+    
+    currentTrajectory = trajectories{k};
+    
+    trajectoryLength = size(currentTrajectory.trajectory,2);
+    trajectoryEnd = currentTrajectory.frameNum;
+    trajectoryStart = trajectoryEnd - trajectoryLength + 1;
+
+    if trajectoryStart > shotStart && trajectoryEnd < shotEnd   
+        tr = currentTrajectory.trajectory;
+%         forKMeans(k,:) = dtw_c(tr(1,:),tr(2,:));
+%         X = fft(tr(1,:));
+%         Y = fft(tr(2,:));
+%         forKMeans(kMeansIndex,:) = [real(X(1)),real(Y(1))];  
+%         correspondance(kMeansIndex,:) = [kMeansIndex,k];
+     
+        currentTrajectory.distance = sqrt(tr(1,:).^2 + tr(2,:).^2);
+        meanDistance = mean(currentTrajectory.distance);
+        p = polyfit(1:trajectoryLength,currentTrajectory.distance,3);
+        pd = polyder(p);
+        pdd = polyder(pd);
+            
+        forKMeans(k,:) = [meanDistance,pd,pdd]; 
+    else
+        forKMeans(k,:) = [0,0,0,0,0,0];
+    end
+end
+% forKMeans(~any(forKMeans,2),:) = [];
+toc;
+
+
+GROUP_NUMBER = 5;
+groups = kmeans(forKMeans,GROUP_NUMBER);
+toc;
+
+%% Plot trajectory groups in different colors
+colorArr = {'b','g','k','r','m','c','y'}; 
+markerArr = {'o','d','+','*','x','.','s','p'}; 
+
+for k = 1:50:size(trajectories,1)
+
+    currentTrajectory = trajectories{k};
+    tr = currentTrajectory.trajectory;
+    trajectoryLength = size(currentTrajectory.trajectory,2);
+    trajectoryEnd = currentTrajectory.frameNum;
+    trajectoryStart = trajectoryEnd - trajectoryLength + 1;
+    
+    if trajectoryStart < shotStart || trajectoryEnd > shotEnd; continue; end
+    
+    trGroup = groups(k);
+    hold on;
+    plot3(tr(2,:),(trajectoryStart-1):(trajectoryEnd-1),...
+        tr(1,:),'Color',colorArr{mod(trGroup,7)+1},'LineWidth',2);
+%     plot3(tr(2,:),(trajectoryStart-1):(trajectoryEnd-1),tr(1,:),'Color',colorArr{mod(trGroup,7)+1},'Marker',markerArr{mod(trGroup,7)+1});
+ 
+end
+set(gca, 'XTick', [], 'YTick', [], 'ZTick', []);
+xlabel('Video Width','FontWeight','Bold');
+ylabel('Time / Frames','FontWeight','Bold');
+zlabel('Video Height','FontWeight','Bold');
+axis tight;
+view(3);
+toc;
+
+
+% for k = 1:size(groups,2)
+% 
+%     currentIndices = groups(:,k);
+%     currentIndices(~any(currentIndices,2),:) = [];  %remove zero rows
+%     if size(currentIndices,1) < 100; continue; end
+%     
+%     for i = 1:1000: size(currentIndices)
+%         currentTrajectory = trajectories{currentIndices(i)};
+%         tr = currentTrajectory.trajectory;
+%         trajectoryLength = size(tr,2);
+%         trajectoryEnd = currentTrajectory.frameNum;
+%         trajectoryStart = trajectoryEnd - trajectoryLength + 1;
+%         hold on;
+%         plot3(tr(2,:),(trajectoryStart-1):(trajectoryEnd-1),tr(1,:),[colorArr{mod(k,7)+1}]);
+%     end
+%     
+% end
+% axis tight;
+% view(3);
+% 

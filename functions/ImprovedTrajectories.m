@@ -123,7 +123,7 @@ function groups = GroupTrajectories(trajectories, saliencyMap, shotBoundaries)
         
         % Find l1 distance of x,y points to the left-top corner
         tr = currentTrajectory.trajectory;
-        currentTrajectory.distance = sqrt(tr(1,:)^2 + tr(2,:)^2);
+        currentTrajectory.distance = sqrt(tr(1,:).^2 + tr(2,:).^2);
 
     end
     toc;
@@ -161,10 +161,34 @@ function groups = GroupTrajectories(trajectories, saliencyMap, shotBoundaries)
             end
 
         end
+        toc;
     end
+    seeds(1,:) = [];
+    seeds = seeds(:);
+    seeds(~any(seeds,2),:) = [];
     toc;
     
+    %Plot seeds
+    for k = 1:5:size(seeds,1)
 
+        currentTrajectory = trajectories{seeds(k)};
+        tr = currentTrajectory.trajectory;
+        trajectoryLength = size(currentTrajectory.trajectory,2);
+        trajectoryEnd = currentTrajectory.frameNum;
+        trajectoryStart = trajectoryEnd - trajectoryLength + 1;
+
+        hold on;
+        plot3(tr(2,:),(trajectoryStart-1):(trajectoryEnd-1),...
+            tr(1,:),'LineWidth',2);
+
+    end
+    xlim([1 size(saliencyMap,2)])
+%     ylim([1 (trajectoryEnd-trajectoryStart)])
+    set(gca, 'XTick', [], 'YTick', [], 'ZTick', []);
+    xlabel('Video Width','FontWeight','Bold');
+    ylabel('Time / Frames','FontWeight','Bold');
+    zlabel('Video Height','FontWeight','Bold');
+    view(3);
     
 %     % Find seed trajectories from ramaining frames
 %     for k = 2:size(accordingToStart,1)
