@@ -18,22 +18,11 @@ function retargettedFrames = Rubinstein2009(originalFrames,newSize)
     [vidHeight, ~, ~, nFrames] = size(originalFrames);
     
     retargettedFrames = zeros(vidHeight,newSize(2),3,nFrames);
-    cd('../retargeting algorithms/Rubinstein2009');
+    cd('../retargeting algorithms/Rubinstein2009');tic;
     for i = 1:nFrames
         [retargettedFrames(:,:,:,i),~] = imretarget(originalFrames(:,:,:,i), [vidHeight newSize(2)], [], p); % vertical seams              
         toc;
     end
-
-%     retargettedFrames = zeros(nFrames,newSize(2),3,vidHeight);
-%     XTframes = permute(originalFrames,[4 2 3 1]);
-%     cd('../retargeting algorithms/Rubinstein2009');
-%     for i = 100:150
-%         [retargettedFrames(:,:,:,i),~] = imretarget(XTframes(:,:,:,i), [nFrames newSize(2)], [], p); % vertical seams              
-%         toc;
-%     end
-%     retargettedFrames = permute(retargettedFrames,[4 2 3 1]);
-
-
     cd('../../bin');
 
 end
@@ -115,14 +104,14 @@ function retargettedFrames = Yan2013_Mine(frames,newSize)
                 SR = vidHeight/NKP; % Search area constant
                 MR = 3;             % Map area constant
 
-                if( KPX(n,k-1)-MR < 1 );            MR = KPX(n,k-1)-1;                 end
+                if( KPX(n,k-1)-MR < 1 );            MR = KPX(n,k-1)-1;              end
                 if( KPX(n,k-1)+MR > vidWidth-t+1);  MR = vidWidth - KPX(n,k-1)-t+1; end
-                if( KPY(n,k-1)-MR < 1);             MR = KPY(n,k-1)-1;                 end
+                if( KPY(n,k-1)-MR < 1);             MR = KPY(n,k-1)-1;              end
                 if( KPY(n,k-1)+MR > vidHeight);     MR = vidHeight - KPY(n,k-1);    end  
 
-                if( KPX(n,k)-SR-MR < 1 );           SR = KPX(n,k)-MR-1;                end
+                if( KPX(n,k)-SR-MR < 1 );           SR = KPX(n,k)-MR-1;             end
                 if( KPX(n,k)+SR+MR > vidWidth-t+1); SR = vidWidth - KPX(n,k)-MR-t+1;end
-                if( KPY(n,k)-SR-MR < 1);            SR = KPY(n,k)-MR-1;                end
+                if( KPY(n,k)-SR-MR < 1);            SR = KPY(n,k)-MR-1;             end
                 if( KPY(n,k)+SR+MR > vidHeight);    SR = vidHeight - KPY(n,k)-MR;   end      
 
                 if( SR < MR ); MR=SR;end
@@ -169,11 +158,11 @@ end
 function retargettedFrames = Yan2013(frames,newSize)
 
     param.alpha = 0.5;
-    param.nkp = 10;
-    param.mw = 3;
-    param.mth = 0.2;
-    group = 5;
-    param.sal_interval = 10;
+    param.nkp = 10; %
+    param.mw = 3; %
+    param.mth = 0.2; %
+    group = 1;
+    param.sal_interval = 1;
     
     [vidHeight, vidWidth, ~, nFrames] = size(frames);
     width_ratio =  newSize(2) / vidWidth;
@@ -187,7 +176,7 @@ function retargettedFrames = Yan2013(frames,newSize)
     
     retargettedFrames = zeros(vidHeight,newSize(2),3,nFrames);
     for k = 1:nFrames; retargettedFrames(:,:,:,k) = im2double(framesCell{k}); end
-    
+        
 end
 
 function retargettedFrames = Cigdem(frames,newSize)

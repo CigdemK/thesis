@@ -1,4 +1,8 @@
 function F = EvaluationMetrics 
+    F.Brightness = @Brightness;
+    F.Sharpness = @Sharpness;
+    F.Blur = @Blur;
+    F.Focus = @Focus;
     F.CompressVideo = @CompressVideo;
     F.DivisiveNormalization = @DivisiveNormalization;
     F.MetrixMuxMSE = @MetrixMuxMSE;
@@ -13,7 +17,77 @@ function F = EvaluationMetrics
     F.MetrixMuxWSNR = @MetrixMuxWSNR;
     F.MetrixMuxNQM = @MetrixMuxNQM;
     F.MetrixMuxIFC = @MetrixMuxIFC;
+end
 
+function D = Focus(videoPath,frames)
+    
+    if nargin < 2
+        video=VideoReader(videoPath);
+        frames = read(video);
+    end
+
+    nFrames = size(frames,4);
+    
+    D = zeros(nFrames,1);
+    for i = 1:nFrames-1
+        D(i) = fmeasure(double(rgb2gray(frames(:,:,:,i))),'SFIL',[]);
+    end
+    
+end
+
+function D = Blur(videoPath,frames)
+    
+    if nargin < 2
+        video=VideoReader(videoPath);
+        frames = read(video);
+    end
+    
+    nFrames = size(frames,4);
+
+    D = zeros(nFrames,1);
+    for i = 1:nFrames-1
+        D(i) = blurMetric(double(rgb2gray(frames(:,:,:,i))));
+    end
+    
+end
+
+function D = Sharpness(videoPath,frames)
+    
+    if nargin < 2
+        video=VideoReader(videoPath);
+        frames = read(video);
+    end
+
+    nFrames = size(frames,4);
+    
+    D = zeros(nFrames,1);
+    for i = 1:nFrames-1
+%         [Gx, Gy]=gradient(frames(:,:,i));
+%         S=sqrt(Gx.*Gx+Gy.*Gy);
+%         D(i) = sum(sum(S))./(numel(Gx));
+        D(i) = sharpness_index(double(rgb2gray(frames(:,:,:,i))));
+    end
+    
+end
+
+function D = Brightness(videoPath,frames)
+
+    if nargin < 2
+        video=VideoReader(videoPath);
+        frames = read(video);
+    end
+
+    nFrames = size(frames,4);
+    
+    D = zeros(nFrames,1);
+    for i = 1:nFrames-1
+        R = im2double(frames(:,:,1,i)); 
+        G = im2double(frames(:,:,2,i)); 
+        B = im2double(frames(:,:,3,i)); 
+        Y = 0.299*R + 0.587*G + 0.114*B;
+        D(i) = mean(Y(:));
+    end
+    
 end
 
 function D = MetrixMuxPSNR(videoPath,frames) % peak signal-to-noise ratio 
