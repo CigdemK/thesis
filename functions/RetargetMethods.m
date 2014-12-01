@@ -33,7 +33,7 @@ end
 
 function retargettedFrames = Yan2013_Mine(frames,newSize)
 
-    NKP = 9;
+    NKP = 10;
 
     Crop = CropFunctions;    
     frames = Crop.RemoveBlackBars(frames);
@@ -46,18 +46,24 @@ function retargettedFrames = Yan2013_Mine(frames,newSize)
     KPY = zeros( NKP , nFrames);
 %     RPMAP = zeros(video.Height , video.Width);
 
-    disp('Starting to remove seams...')
+    saliencyMap = zeros(vidHeight,vidWidth,nFrames);
+    tic;for i = 1:nFrames; saliencyMap(:,:,i) = IttiSalMap(frames(:,:,:,i)); end;toc;
+
     oldFrames = frames;
-    tic;
+    oldSaliencyMap = saliencyMap;
+    disp('Starting to remove seams...')
     for t=1:vidWidth-newSize(2); % t = number of seams removed
         
         retargettedFrames = zeros(vidHeight,vidWidth-t,3,nFrames);
+        retargettedSaliency = zeros(vidHeight,vidWidth-t,nFrames);
         
         % For the first frame, remove the seam without optimization
-        EM = findEnergy(im2double(oldFrames(:,:,:,1)));
+        
+        EM = FindEnergyYan(mat2gray(oldFrames(:,:,:,1)),oldSaliencyMap(:,:,i));
         seamImage = findSeamImg(EM);
-        seamVector(:,1) = findSeam(seamImage);  
+        seamVector(:,1) = findSeam(seamImage);
         retargettedFrames(:,:,:,1) = SeamCut(oldFrames(:,:,:,1),seamVector(:,1));
+        retargettedSaliency(:,:,1) = SeamCut(oldSaliencyMap(:,:,1),seamVector(:,1));
 
         for n = 1:NKP
 
@@ -73,12 +79,11 @@ function retargettedFrames = Yan2013_Mine(frames,newSize)
             KPY( n , 1 ) = y( ind , 1);
 
         end
-        
         % For the remaining frames
 
         for k = 2 : nFrames
 
-            EM = findEnergy(im2double(oldFrames(:,:,:,k)));
+            EM = FindEnergyYan(im2double(oldFrames(:,:,:,k)),oldSaliencyMap(:,:,i));
             seamImage = findSeamImg(EM);
             seamVector(:,k) = findSeam(seamImage);
 
@@ -148,21 +153,24 @@ function retargettedFrames = Yan2013_Mine(frames,newSize)
             EM = EM .* RPMAP;
             seamImage = findSeamImg(EM);
             seamVector(:,k) = findSeam(seamImage);
-            retargettedFrames(:,:,:,k) = SeamCut(oldFrames(:,:,:,k),seamVector(:,k));   
+            retargettedFrames(:,:,:,k) = SeamCut(oldFrames(:,:,:,k),seamVector(:,k)); 
+            retargettedSaliency(:,:,k) = SeamCut(oldSaliencyMap(:,:,k),seamVector(:,k));
         end
         oldFrames = retargettedFrames;
+        oldSaliencyMap = retargettedSaliency;
         toc;
     end
+    retargettedFrames = uint8(retargettedFrames);
 end
 
 function retargettedFrames = Yan2013(frames,newSize)
 
     param.alpha = 0.5;
-    param.nkp = 10; %
-    param.mw = 3; %
-    param.mth = 0.2; %
-    group = 1;
-    param.sal_interval = 1;
+    param.nkp = 10;
+    param.mw = 3;
+    param.mth = 0.2;
+    group = 5;
+    param.sal_interval = 10;
     
     [vidHeight, vidWidth, ~, nFrames] = size(frames);
     width_ratio =  newSize(2) / vidWidth;
@@ -196,14 +204,12 @@ function retargettedFrames = Cigdem(frames,newSize)
     
 %     [videoSaliencyMap , opticalFlowMap] = VideoSal.Nguyen2013('',frames);
     load('videoSaliency.mat');
+    load('saliencyMaps.mat');
     load('opticalFlowMap');
     load('F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00001\ImprovedTrajectoryOriginalTJS.mat');
-%     load('groups.mat');
     
-%     importantPts = ThresholdSaliency(videoSaliencyMap);
-    videoSaliency(videoSaliency<0.7) = 0;
-    seedSaliency = videoSaliency(:,:,1) + videoSaliency(:,:,2) + videoSaliency(:,:,3);
-    trajectories = ImpTrajectories.GroupTrajectories(trajectories,seedSaliency,[shotStart shotEnd]);
+    keyFrames = GetKeyFrames(saliencyMaps);
+    [~,importantPts] = ImpTrajectories.GetSeedTrajectoriesFromKeyFrames(trajectories,keyFrames,[shotStart shotEnd]);
     avgSaliency = CalculateMeanSaliency(nFrames , importantPts );   
     [avgOpticalFlow] = CreateFlow(shotBoundaries, avgSaliency, frames, opticalFlowMap);
 
@@ -216,69 +222,46 @@ function retargettedFrames = Cigdem(frames,newSize)
         frames(:,:,:,k) = imresize(crop , [CROP ,CROP]);
     end
 
-%     [vidHeight, vidWidth, ~, nFrames] = size(frames);
-%     load('videoSaliency.mat');
-%     load('F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00001\ImprovedTrajectoryOriginalTJS.mat');
-%     
-%     startSaliencyMap = mean(videoSaliency(:,:,1:3),3);
-%     startSaliencyMap(startSaliencyMap<0.6) = 0;
-%     
-%     trajectoryIndices = 1;
-%     currentFrame = 1;
-%     trajectoriesToBeTracked = [];
-%     while 1
-%         
-%         currentTrajectory = trajectories{trajectoryIndices};
-%         trajectoryLength = size(currentTrajectory.trajectory,2);
-%         trajectoryEnd = currentTrajectory.frameNum;
-%         trajectoryStart = trajectoryEnd - trajectoryLength + 1;
-%         
-%         if trajectoryStart == currentFrame || ...
-%                 trajectoryStart == currentFrame+2 || ...
-%                 trajectoryStart == currentFrame+3
-%             trajectoriesToBeTracked = [trajectoriesToBeTracked;trajectoryIndices];
-%         elseif trajectoryStart > currentFrame + 3
-%             break;
-%         end
-%         trajectoryIndices = trajectoryIndices + 1;
-%         
-%     end
-%     
-%     meanX = ;
-%     meanY = ; 
-%     
-%     
-%     [vidHeight, vidWidth, ~, nFrames] = size(frames);
-%     saliencyMaps = zeros(vidHeight,vidWidth,nFrames);
-%     for i = 1:nFrames
-%         saliencyMaps(:,:,i) = saliency(frames(:,:,:,i));
-%     end
-%     save('saliencyMaps.mat','saliencyMaps');
-%     load('saliencyMaps.mat','saliencyMaps');
-% 
-%     vid = VideoSaliency;
-%     videoSaliency = vid.Nguyen2013('',frames);
-%     save('videoSaliency.mat','videoSaliency');
-% 
-%     load('videoSaliency.mat');
-%     load('F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00001\ImprovedTrajectoryOriginalTJS.mat');
-%     tmpsalmap = videoSaliency;
-%     videoSaliency(videoSaliency<0.7) = 0;
-%     imgSaliency = ImageSaliency;
-%     saliencyMapFixations = imgSaliency.ActionsInTheEyeFixation('F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00001.avi');
-%     
-%     for i=1:10:nFrames; 
-%         figure;
-%         subplot(3,1,1); imshow(videoSaliency(:,:,i));
-%         subplot(3,1,2); imshow(tmpsalmap(:,:,i));
-%         subplot(3,1,3); imshow(saliencyMapFixations(:,:,i));
-%     end
-    
+    retargettedFrames = frames;
     
 end
 
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % Private Functions
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+function keyFrames = GetKeyFrames(saliencyMaps)
+    saliencyMaps(saliencyMaps<0.7) = 0;
+    keyFrames = saliencyMaps(:,:,1) + saliencyMaps(:,:,2) + saliencyMaps(:,:,3);
+end
 
+function sal = IttiSalMap(img)
+    [imHeight, imWidth, ~] = size(img);
+    sal = simpsal(img);
+    sal = imresize(sal, [imHeight imWidth]);
+end
+
+function EM = FindEnergyYan(x,sal)
+
+    [imHeight, imWidth, imDim] = size(x);
+
+    Grdx =[ 1   2   1;
+            0   0   0;
+           -1  -2  -1];
+    Grdy =[-1   0   1;
+           -2   0   2;
+           -1   0   1];
+
+    for i=1:imDim
+        Eh(:,:,i)=conv2(x(:,:,i),Grdx,'same');
+        Ev(:,:,i)=conv2(x(:,:,i),Grdy,'same');
+        E(:,:,i)=sqrt(Eh(:,:,i).^2+Ev(:,:,i).^2);
+    end
+    gr = 1 / imDim*sum(E,3);   %finds average gradient image if RGB image
+    
+    EM = 0.5.*sal + 0.5.*gr ;
+    
+end
 
 
 
