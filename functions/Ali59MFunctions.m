@@ -1,7 +1,8 @@
 function F = Ali59MFunctions
     F.ShowSaliencyPoints = @ShowSaliencyPoints;
-%     F.CropWithHomography = @CropWithHomography;
     F.CropWithVideoSaliency = @CropWithVideoSaliency;
+    F.CalculateMeanSaliency = @CalculateMeanSaliency;
+    F.CreateFlow = @CreateFlow;
 end
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -100,10 +101,6 @@ frames = frames(:,:,:,1:3);
 
 end
 
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% % Private Functions
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 function [avg] = CalculateMeanSaliency( maxFrame  , eyes )
     avg = [];
     for k = 1 : maxFrame
@@ -114,7 +111,7 @@ end
 
 function [avgFlow] = CreateFlow(shotBoundaries, avgSaliency , frames , opticalFlowMap )
 
-    if nargin < 6
+    if nargin < 4
         Motion = MotionFunctions;
         [opticalFlowX,opticalFlowY] = Motion.MyOpticalFlow(frames);
         opticalFlowMap(:,:,:,1) = opticalFlowX;
@@ -139,13 +136,18 @@ function [avgFlow] = CreateFlow(shotBoundaries, avgSaliency , frames , opticalFl
 
 end
 
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % Private Functions
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 function [avgFlow] = CalculateFlowMean(startingPoint , Vx ,Vy)
 
     shotLength = length(Vx);
     Y = startingPoint(1,1);
     X = startingPoint(1,2);
-    avgFlow = [X Y];
-    meanFlow = [Vx Vy];
+    avgFlow = [Y X];
+    meanFlow = [Vy Vx];
     
     for k = 2 : shotLength %dismiss the first frame of the shot since it is set to startingPoint
         transformed = [meanFlow(k,:) 1]';

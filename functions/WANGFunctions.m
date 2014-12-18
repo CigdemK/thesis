@@ -12,9 +12,6 @@ function scaledPathlines = PerFrameOptimization(moviePath, newsize)
     video = VideoReader( moviePath );
     frames = read(video);
     
-% frames = frames(:,:,:,1:5);
-% nFrames = 5;
-    
 %   Remove black bars and adjust the size parameters
     Cropper = CropFunctions;
     movNoBars = Cropper.RemoveBlackBars(frames);
@@ -27,22 +24,26 @@ function scaledPathlines = PerFrameOptimization(moviePath, newsize)
     gridX = zeros(ceil(vidHeight/50),ceil(vidWidth/50),nFrames);
     gridY = zeros(ceil(vidHeight/50),ceil(vidWidth/50),nFrames);
     for k = 1:nFrames
-        originalFrames(:,:,:,k) = im2double(movNoBars(k).cdata);
-        [tmp, gridX(:,:,k), gridY(:,:,k)]= ScaleStretch(movNoBars(k).cdata,newsize);
-        scaledFrames(:,:,:,k) = im2double(tmp);
+        originalFrames(:,:,:,k) = frames(:,:,:,k);
+%         [tmp, gridX(:,:,k), gridY(:,:,k)]= ScaleStretch(frames(:,:,:,k),newsize);
+%         scaledFrames(:,:,:,k) = im2double(tmp);
     end
     toc;
-    
+%     save('scaledFrames.mat','scaledFrames');
+    load('scaledFrames.mat')    
+
 % Step 2: Calculate pathlines, adjacency and correspondance
 
     originalPathlines   = GetPathlines( originalFrames, [vidHeight/20 vidWidth/20] ); toc;
     scaledPathlines     = GetPathlines( scaledFrames, [vidHeight/20 vidWidth/20] ); toc;
-
+    save('pathlineInfo.mat','originalPathlines','scaledPathlines');
     correspondances = GetCorrespondances(gridX, gridY, originalPathlines, scaledPathlines, [vidHeight,vidWidth] );
     toc;
+    save('pathlineInfo.mat','originalPathlines','scaledPathlines','correspondances');
     originalPathlines = originalPathlines(correspondances(:,1),:,:); 
     scaledPathlines = scaledPathlines(correspondances(:,2),:,:);   
     originalAdjacencies = CalculateAdjacencies(originalPathlines); toc;
+    save('pathlineInfo.mat','originalPathlines','scaledPathlines','correspondances','originalAdjacencies');
     
  % Step 3: Optimize Scaling with the Pathlines   
     

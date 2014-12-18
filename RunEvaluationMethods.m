@@ -1,25 +1,37 @@
 clc,clear
 
-videoPath = 'F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00001.avi';
+warning off MATLAB:MKDIR:DirectoryExists
+
+videoPath = 'F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00001.aviLinear.avi';
+methodName = {'Shakiness'};
+% methodName = {'Focus','Blur','Sharpness','Brightness','Compress','PSNR','MSE', ...
+%             'VIFP','VSNR','MSSIM','SSIM','UQI','SNR','WSNR'};
 % methodName = {'Compress','PSNR','MSE','VIFP','VIF','VSNR','MSSIM','SSIM',...
 %             'UQI','SNR','WSNR','NQM','IFC','DivisiveNormalization','Focus',...
 %             'Blur','Sharpness','Brightness'};
-methodName = {'Brightness','DivisiveNormalization'};
 
 video=VideoReader(videoPath);
 frames = read(video);
-nFrames = size(frames,4);
 
+frames = frames(:,:,:,1:10);
+
+
+nFrames = size(frames,4);
+D=cell(1,1);
 Eval=EvaluationMetrics;
 for i = 1:size(methodName,2)
     currentMethod = methodName{i};
     switch currentMethod
+        case 'Shakiness'
+            res = Eval.Shakiness(videoPath,frames);
         case 'DivisiveNormalization'
             res = Eval.DivisiveNormalization(videoPath,frames);
         case 'Focus'
             res = Eval.Focus(videoPath,frames);
         case 'Blur'
             res = Eval.Blur(videoPath,frames);
+        case 'MDE'
+            res = Eval.MDE(videoPath,frames);
         case 'Sharpness'
             res = Eval.Sharpness(videoPath,frames);
         case 'Brightness'
@@ -54,10 +66,13 @@ for i = 1:size(methodName,2)
             disp([methodName{i} ': No such evaluation method!']);
             res = [];
     end
-    figure; plot(1:nFrames-1,res(1:end-1));
-    xlabel('Frame Number','FontWeight','Bold');
-    ylabel(methodName{i},'FontWeight','Bold');
-    axis tight;
+    
+    D{end+1} = {methodName{i},res}
+    
+%     figure; plot(1:nFrames-1,res(1:end-1));
+%     xlabel('Frame Number','FontWeight','Bold');
+%     ylabel(methodName{i},'FontWeight','Bold');
+%     axis tight;
     
 end
 

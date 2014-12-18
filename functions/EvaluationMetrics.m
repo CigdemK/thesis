@@ -4,6 +4,9 @@ function F = EvaluationMetrics
     F.Blur = @Blur;
     F.Focus = @Focus;
     F.CompressVideo = @CompressVideo;
+    F.MDE = @MDE;
+    F.MUSE = @MUSE;
+    F.Shakiness = @Shakiness;
     F.DivisiveNormalization = @DivisiveNormalization;
     F.MetrixMuxMSE = @MetrixMuxMSE;
     F.MetrixMuxPSNR = @MetrixMuxPSNR;
@@ -19,6 +22,74 @@ function F = EvaluationMetrics
     F.MetrixMuxIFC = @MetrixMuxIFC;
 end
 
+function D = Shakiness(videoPath,frames)
+    
+    if nargin < 2
+        video=VideoReader(videoPath);
+        frames = read(video);
+    end
+    
+    nFrames = size(frames,4);
+    frames = mat2gray(frames);
+    
+    D = zeros(nFrames,1);
+    tic;
+    for i = 1:nFrames-1    
+        
+        ptThresh = 0.1;
+        points1 = detectFASTFeatures(frames(:,:,i), 'MinContrast', ptThresh);
+        points2 = detectFASTFeatures(frames(:,:,i+1), 'MinContrast', ptThresh);
+        [features1, points1] = extractFeatures(frames(:,:,i), points1);
+        [features2, points2] = extractFeatures(frames(:,:,i+1), points2);
+        indexPairs = matchFeatures(features1, features2);
+        points1 = points1(indexPairs(:, 1), :);
+        points2 = points2(indexPairs(:, 2), :);
+        avg = mean(abs(points1.Location-points2.Location));
+        D(i) = sqrt(avg(1)^2+avg(2)^2);
+        toc;
+    end
+    
+end
+function D = MUSE(videoPath,frames)
+    
+    if nargin < 2
+        video=VideoReader(videoPath);
+        frames = read(video);
+    end
+
+    nFrames = size(frames,4);
+    
+    D = zeros(nFrames,1);
+    parameterfile = 'C:\Program Files\MATLAB\R2014a\toolbox\flow_based_superpixel_benchmark_1_0\configs\box.yaml';
+    tic;
+    for i = 1:nFrames-1
+        main_runKittiBenchmarkMDE(parameterfile,frames(:,:,:,i),frames(:,:,:,i+1));
+        avgMDE = main_evaluateKittiBenchmarkMDE(parameterfile,frames(:,:,:,i),frames(:,:,:,i+1));
+        D(i) = avgMDE.meanRatio;
+    end
+    
+end
+
+function D = MDE(videoPath,frames)
+    
+    if nargin < 2
+        video=VideoReader(videoPath);
+        frames = read(video);
+    end
+
+    nFrames = size(frames,4);
+    
+    D = zeros(nFrames,1);
+    parameterfile = 'C:\Program Files\MATLAB\R2014a\toolbox\flow_based_superpixel_benchmark_1_0\configs\box.yaml';
+    tic;
+    for i = 1:nFrames-1
+        main_runKittiBenchmarkMDE(parameterfile,frames(:,:,:,i),frames(:,:,:,i+1));
+        avgMDE = main_evaluateKittiBenchmarkMDE(parameterfile,frames(:,:,:,i),frames(:,:,:,i+1));
+        D(i) = avgMDE.meanRatio;
+    end
+    
+end
+
 function D = Focus(videoPath,frames)
     
     if nargin < 2
@@ -29,7 +100,7 @@ function D = Focus(videoPath,frames)
     nFrames = size(frames,4);
     
     D = zeros(nFrames,1);
-    for i = 1:nFrames-1
+    for i = 1:nFrames
         D(i) = fmeasure(double(rgb2gray(frames(:,:,:,i))),'SFIL',[]);
     end
     
@@ -45,9 +116,11 @@ function D = Blur(videoPath,frames)
     nFrames = size(frames,4);
 
     D = zeros(nFrames,1);
-    for i = 1:nFrames-1
+    for i = 1:nFrames
         D(i) = blurMetric(double(rgb2gray(frames(:,:,:,i))));
     end
+    
+    D = 1-D;
     
 end
 
@@ -61,7 +134,7 @@ function D = Sharpness(videoPath,frames)
     nFrames = size(frames,4);
     
     D = zeros(nFrames,1);
-    for i = 1:nFrames-1
+    for i = 1:nFrames
 %         [Gx, Gy]=gradient(frames(:,:,i));
 %         S=sqrt(Gx.*Gx+Gy.*Gy);
 %         D(i) = sum(sum(S))./(numel(Gx));
@@ -80,7 +153,7 @@ function D = Brightness(videoPath,frames)
     nFrames = size(frames,4);
     
     D = zeros(nFrames,1);
-    for i = 1:nFrames-1
+    for i = 1:nFrames
         R = im2double(frames(:,:,1,i)); 
         G = im2double(frames(:,:,2,i)); 
         B = im2double(frames(:,:,3,i)); 
@@ -324,3 +397,5 @@ function compressRatio = CompressVideo(videoPath,frames)
     compressRatio = ( 100 * retSize ) / originalSize;
     
 end
+
+

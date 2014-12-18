@@ -6,7 +6,7 @@ end
 
 % PUBLIC FUNCTIONS
 
-function [crop] = EstimateCropWindowSize(avgFlow, eyes , shotBoundaries ,minSize)
+function [crop] = EstimateCropWindowSize(avgFlow, eyes , shotBoundaries ,minSize,maxSize)
  
     crop = [];
     nrShots = length(shotBoundaries)-1;
@@ -17,27 +17,27 @@ function [crop] = EstimateCropWindowSize(avgFlow, eyes , shotBoundaries ,minSize
         shotEnd = shotBoundaries(k+1)-1;
         shotFlow = avgFlow( shotStart:shotEnd , :);
         
-        cropShot = minSize;
         for t = shotStart : shotEnd     
             
             % get all gaze pts in each frame
-            indices = find( eyes( : , 1 ) == t );
+            indices = find( eyes( : , 2 ) == t );
             nrIndices = length(indices);
-            Fx = eyes( indices( 1:nrIndices ) , 3 );
-            Fy = eyes( indices( 1:nrIndices ) , 2 );
+            Fx = eyes( indices( 1:nrIndices ) , 4 );
+            Fy = eyes( indices( 1:nrIndices ) , 3 );
             points = [Fx Fy];
             points = unique(points, 'rows'); % remove rows having same X-Y values
             
-            isInside = arrayfun(@(x)Util.CheckIsInside( avgFlow(t,:) , cropShot.*ratio , points(x,:) , maxSize ) , 1:size( points(:,1) ));
+            isInside = arrayfun(@(x)Util.CheckIsInside( avgFlow(t,:) , minSize , points(x,:) , maxSize ) , 1:size( points(:,1) ));
             outsiders = points(find(isInside == 0),:);
             extremes = [ min(outsiders(:,1)) max(outsiders(:,1)) ;
                          min(outsiders(:,2)) max(outsiders(:,2))];
                      
             % enlarge crop size for that shot if any point is left
             if ~(isempty(extremes))
-                cropShot = ChangeCropSize( extremes , avgFlow(t,:) , cropShot , ratio , maxSize);
+                cropShot(t) = ChangeCropSize( extremes , avgFlow(t,:) , minSize , maxSize);
             end
         end
+        cropShot = max(cropShot);
         crop = [crop; repmat(cropShot , shotEnd-shotStart+1 , 1)];
     end
     crop = [crop; crop(length(crop),:)];
@@ -97,28 +97,29 @@ end
 
 % PRIVATE FUNCTIONS
 
-function [crop] = ChangeCropSize( extremes , center , minSize , ratio , maxSize)
+function [crop] = ChangeCropSize( extremes , center , minSize , maxSize)
     X = extremes(1,:);
     Y = extremes(2,:);
     crop = minSize;
     
-    if X(1,2) > center(1,1) + (crop*ratio(1,1))
-        crop = ceil( (double(X(1,1)) - center(1,1)) / ratio(1,1)); 
+    if X(1,2) > center(1,1) + minSize(1,1)
+        crop = ceil( double(X(1,2)) - center(1,1)); 
     end
-    if Y(1,2) > center(1,2) + (crop*ratio(1,2))
-       crop = ceil( (double(Y(1,2)) - center(1,2)) / ratio(1,2)); 
+    if Y(1,2) > center(1,2) + minSize(1,2)
+       crop = ceil( double(Y(1,2)) - center(1,2)); 
     end
-    if X(1,1) < center(1,1) - (crop*ratio(1,1))
-       crop = floor( (center(1,1) - double(X(1,1))) / ratio(1,1)); 
+    if X(1,1) < center(1,1) - minSize(1,1)
+       crop = floor( center(1,1) - double(X(1,1))); 
     end
-    if Y(1,2) < center(1,2) - (crop*ratio(1,2))
-       crop = floor( (center(1,2) - double(Y(1,2))) / ratio(1,2)); 
+    if Y(1,2) < center(1,2) - minSize(1,2)
+       crop = floor( center(1,2) - double(Y(1,2))); 
     end 
-    if (  center(1,1) - crop*ratio(1,1) < 0  ||...
-            center(1,2) - crop*ratio(1,2) < 0 ||...
-            crop*ratio(1,1) + center(1,1) > maxSize(1,1) ||...
-            crop*ratio(1,2) + center(1,2) > maxSize(1,2) )
-            
-        crop = minSize;
+    if (  minSize(1,1) + center(1,1) > maxSize(1,1) ||...
+          minSize(1,2) + center(1,2) > maxSize(1,2) )
+        crop = min((maxSize(1,2)-center(1,2)), (maxSize(1,1)-center(1,1)));
+    end
+    if ( center(1,1) - minSize(1,1) < 0  ||...
+         center(1,2) - minSize(1,2) < 0 )
+        crop = max(center(1,2),center(1,1));
     end
 end

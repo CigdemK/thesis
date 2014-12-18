@@ -102,10 +102,10 @@ function trajectoriesByFrame = GetTrajectoriesByFrame(trajectories)
 
 end
 
-function seeds = GetSeedTrajectoriesFromKeyFrames(trajectories, saliencyMap, shotBoundaries)
+function seeds= GetSeedTrajectoriesFromKeyFrames(trajectories, saliencyMap, shotBoundaries, adjacencyDistance)
 
     if nargin < 4
-        ADJACENCY_DISTANCE = 10;
+        adjacencyDistance = 20;
     end
 
     nFrames = trajectories{end}.frameNum;
@@ -147,33 +147,38 @@ function seeds = GetSeedTrajectoriesFromKeyFrames(trajectories, saliencyMap, sho
     % Find seed trajectories from ramaining frames
     for k = 2:size(accordingToStart,1)
         currentStart = accordingToStart{k};
-        for i = 1:size(currentStart,2)
+        for i = 1:5:size(currentStart,2)
 
             traj = trajectories{currentStart(i)}.trajectory; 
 
-            % Check seeds of the previous frame
-            for t = 2:seeds(1,k-1)-1
-                seed = trajectories{seeds(t,k-1)}.trajectory;
-                distance = mean(sqrt((traj(2,1:end-1) - seed(2,2:end)).^2 + ...
-                    (traj(1,1:end-1) - seed(1,2:end)).^2 ));
-                if distance < ADJACENCY_DISTANCE
-                    seeds(seeds(1,k),k) = currentStart(i);
-                    seeds(1,k) = seeds(1,k) + 1;
-                    break;
+            % Check seeds of the previous n frames
+            for j = 1:10
+                if k > j
+                    for t = 2:seeds(1,k-j)-1
+                        seed = trajectories{seeds(t,k-j)}.trajectory;
+                        distancex = mean(abs(traj(2,1:end-j) - seed(2,j+1:end)));
+                        distancey = mean(abs(traj(1,1:end-j) - seed(1,j+1:end)));
+                        distance = sqrt(distancex^2+distancey^2);
+                        if distance < adjacencyDistance
+                            seeds(seeds(1,k),k) = currentStart(i);
+                            seeds(1,k) = seeds(1,k) + 1;
+                            break;
+                        end
+                    end
                 end
             end
-
         end
     end
     seeds(1,:) = [];
-    seeds = seeds(:);
+%     seeds = seeds(:);
     seeds(~any(seeds,2),:) = []; %remove rows
-
+ 
 end
 
-function groups = GroupTrajectoriesManual(trajectories, shotBoundaries)
+function groups = GroupTrajectoriesManual(trajectories, shotBoundaries, adjacencyDistance)
 
     % Group trajectories according to their starting frame
+    nFrames = trajectories{end}.frameNum;
     accordingToStart = cell(nFrames,1);
     for i = 1:nFrames; accordingToStart{i} = []; end
     for k = 1:size(trajectories,1)
@@ -189,16 +194,15 @@ function groups = GroupTrajectoriesManual(trajectories, shotBoundaries)
         end
 
     end
-    toc;
 
     % Find adjacent trajectories
-    ADJACENCY_DISTANCE = 10;
+    adjacencyDistance = 10;
     adjacencies = zeros(100000,2);
     adjacencies(1,1) = 2; % keep the last index in the first element
     for k = 1:nFrames
 
         currentStart = accordingToStart{k};
-        for i = 1:50:size(currentStart,2)
+        for i = 1:10:size(currentStart,2)
 
             traji = trajectories{currentStart(i)}.trajectory; 
 
@@ -206,21 +210,25 @@ function groups = GroupTrajectoriesManual(trajectories, shotBoundaries)
             for j = i+1:size(currentStart,2)
                 trajj = trajectories{currentStart(j)}.trajectory;
                 distance = abs(mean(traji(2,:) - trajj(2,:)));
-                if distance < ADJACENCY_DISTANCE
+                if distance < adjacencyDistance
                     adjacencies(adjacencies(1,1),:) = [currentStart(i),currentStart(j)];
                     adjacencies(1,1) = adjacencies(1,1) + 1;
                 end
             end
 
             % Check trajectories starting from the -1 frame
-            if k > 1
-                possibleStart = accordingToStart{k-1};
-                for t = 1:size(possibleStart,2)
-                    trajj = trajectories{possibleStart(t)}.trajectory;
-                    distance = abs(mean(traji(2,1:end-1) - trajj(2,2:end)));
-                    if distance < ADJACENCY_DISTANCE
-                        adjacencies(adjacencies(1,1),:) = [currentStart(i),possibleStart(t)];
-                        adjacencies(1,1) = adjacencies(1,1) + 1;
+            if k > 5
+                for j = 1:5
+                    possibleStart = accordingToStart{k-j};
+                    for t = 1:size(possibleStart,2)
+                        trajj = trajectories{possibleStart(t)}.trajectory;
+                        distancex = mean(abs(traji(2,1:end-j) - trajj(2,j+1:end)));
+                        distancey = mean(abs(traji(1,1:end-j) - trajj(1,j+1:end)));
+                        distance = sqrt(distancex^2+distancey^2);
+                        if distance < adjacencyDistance
+                            adjacencies(adjacencies(1,1),:) = [currentStart(i),possibleStart(t)];
+                            adjacencies(1,1) = adjacencies(1,1) + 1;
+                        end
                     end
                 end
             end
@@ -274,7 +282,7 @@ function groups = GroupTrajectoriesManual(trajectories, shotBoundaries)
 
     end
     groups(:,~any(groups,1)) = [];  % Remove all zero columns
-
+    groups(~any(groups,2),:) = [];  % Remove all zero rows
 end
 
 function groups = GroupTrajectoriesKmeans(trajectories, shotBoundaries)
@@ -316,7 +324,7 @@ end
 
 function PlotSeeds(trajectories,seeds)
 
-    for k = 1:5:size(seeds,1)
+    for k = 1:size(seeds,1)
 
         currentTrajectory = trajectories{seeds(k)};
         tr = currentTrajectory.trajectory;
@@ -329,7 +337,7 @@ function PlotSeeds(trajectories,seeds)
             tr(1,:),'LineWidth',2);
 
     end
-    xlim([1 size(saliencyMap,2)])
+    xlim([1 576])
 %     ylim([1 (trajectoryEnd-trajectoryStart)])
     set(gca, 'XTick', [], 'YTick', [], 'ZTick', []);
     xlabel('Video Width','FontWeight','Bold');
@@ -341,25 +349,28 @@ end
 
 function PlotGroups(trajectories,groups,shotBoundaries)
 
-    colorArr = {'b','g','k','r','m','c','y'}; 
+    colorArr = {'b','m','k','g','r','c','y'}; 
 %     markerArr = {'o','d','+','*','x','.','s','p'}; 
 
-    for k = 1:50:size(trajectories,1)
+    for k = 1:size(groups,2)
 
-        currentTrajectory = trajectories{k};
-        tr = currentTrajectory.trajectory;
-        trajectoryLength = size(currentTrajectory.trajectory,2);
-        trajectoryEnd = currentTrajectory.frameNum;
-        trajectoryStart = trajectoryEnd - trajectoryLength + 1;
+        currentGroup = groups(:,k);
+        currentGroup(~any(currentGroup,2),:) = [];
+        if size(currentGroup,1) < 300; continue; end;
+        
+        for i = 1: 50 : size(currentGroup,1)
+            
+            currentTrajectory = trajectories{currentGroup(i)};
+            tr = currentTrajectory.trajectory;
 
-        if trajectoryStart < shotBoundaries(1) || trajectoryEnd > shotBoundaries(2); continue; end
+            trajectoryLength = size(tr,2);
 
-        trGroup = groups(k);
-        hold on;
-        plot3(tr(2,:),(trajectoryStart-1):(trajectoryEnd-1),...
-            tr(1,:),'Color',colorArr{mod(trGroup,7)+1},'LineWidth',2);
-    %     plot3(tr(2,:),(trajectoryStart-1):(trajectoryEnd-1),tr(1,:),'Color',colorArr{mod(trGroup,7)+1},'Marker',markerArr{mod(trGroup,7)+1});
-
+            trajectoryEnd = currentTrajectory.frameNum;
+            trajectoryStart = trajectoryEnd - trajectoryLength + 1;
+            hold on;
+            plot3(tr(2,:),(trajectoryStart-1):(trajectoryEnd-1),...
+                tr(1,:),'Color',colorArr{mod(k,7)+1},'LineWidth',2);
+        end
     end
     set(gca, 'XTick', [], 'YTick', [], 'ZTick', []);
     xlabel('Video Width','FontWeight','Bold');

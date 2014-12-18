@@ -21,7 +21,6 @@ function retargettedFrames = Rubinstein2009(originalFrames,newSize)
     cd('../retargeting algorithms/Rubinstein2009');tic;
     for i = 1:nFrames
         [retargettedFrames(:,:,:,i),~] = imretarget(originalFrames(:,:,:,i), [vidHeight newSize(2)], [], p); % vertical seams              
-        toc;
     end
     cd('../../bin');
 
@@ -47,7 +46,7 @@ function retargettedFrames = Yan2013_Mine(frames,newSize)
 %     RPMAP = zeros(video.Height , video.Width);
 
     saliencyMap = zeros(vidHeight,vidWidth,nFrames);
-    tic;for i = 1:nFrames; saliencyMap(:,:,i) = IttiSalMap(frames(:,:,:,i)); end;toc;
+    for i = 1:nFrames; saliencyMap(:,:,i) = IttiSalMap(frames(:,:,:,i)); end;
 
     oldFrames = frames;
     oldSaliencyMap = saliencyMap;
@@ -158,7 +157,6 @@ function retargettedFrames = Yan2013_Mine(frames,newSize)
         end
         oldFrames = retargettedFrames;
         oldSaliencyMap = retargettedSaliency;
-        toc;
     end
     retargettedFrames = uint8(retargettedFrames);
 end
@@ -196,11 +194,12 @@ function retargettedFrames = Cigdem(frames,newSize)
     VideoSal = VideoSaliency;
     Util = UtilFunctions;
     ImpTrajectories = ImprovedTrajectories;
+    Ali = Ali59MFunctions;
     
     frames = Cropper.RemoveBlackBars(frames);
     [vidHeight,vidWidth,~,nFrames] = size(frames);
     shotBoundaries = Util.DetectShotBoundaries(frames);
-    CROP = [vidHeight/newSize(1) vidWidth/newSize(2)];
+    CROP = [newSize(1)/vidHeight newSize(2)/vidWidth];
     
 %     [videoSaliencyMap , opticalFlowMap] = VideoSal.Nguyen2013('',frames);
     load('videoSaliency.mat');
@@ -209,26 +208,51 @@ function retargettedFrames = Cigdem(frames,newSize)
     load('F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00001\ImprovedTrajectoryOriginalTJS.mat');
     
     keyFrames = GetKeyFrames(saliencyMaps);
-    [~,importantPts] = ImpTrajectories.GetSeedTrajectoriesFromKeyFrames(trajectories,keyFrames,[shotStart shotEnd]);
-    avgSaliency = CalculateMeanSaliency(nFrames , importantPts );   
-    [avgOpticalFlow] = CreateFlow(shotBoundaries, avgSaliency, frames, opticalFlowMap);
-
-    cropArray = Cropper.EstimateCropWindowSize(avgOpticalFlow, importantPts, shotBoundaries, CROP);
-    [cropX, cropY] = Cropper.CreateCropWindow( cropArray .* CROP(1,1) , cropArray .* CROP(1,2) , avgOpticalFlow(1:nFrames,:) , vidWidth , vidHeight );
+%     seeds = ImpTrajectories.GetSeedTrajectoriesFromKeyFrames(trajectories,keyFrames,[shotStart shotEnd]);
+%     importantPts = GetPointsFromSeeds(trajectories,seeds);
+%     save('tmp.mat','importantPts','seeds');
+    load('tmp.mat');
+    avgSaliency = Ali.CalculateMeanSaliency(nFrames , importantPts );   
+    avgSaliency(~any(isnan(avgSaliency),2),:);
+    avgSaliency(end+1,:) = avgSaliency(end,:);
+    [avgOpticalFlow] = Ali.CreateFlow([1 shotEnd-shotStart], avgSaliency(1:shotEnd-shotStart,:),...
+                        frames(1:shotEnd-shotStart), opticalFlowMap);
+    cropArray = Cropper.EstimateCropWindowSize(avgOpticalFlow, importantPts, [1 shotEnd-shotStart], CROP.*20, newSize);
+cropArray = repmat(cropArray(1),[1 nFrames]);
+avgOpticalFlow = reshape(repmat(avgOpticalFlow(1,:),[1 nFrames]),[2 nFrames])';
+    [cropX, cropY] = Cropper.CreateCropWindow( cropArray .* CROP(1,1) ,...
+        cropArray .* CROP(1,2) , avgOpticalFlow(1:nFrames,:) , vidWidth , vidHeight );
 
     % Create cropped movie with cropX cropY values
     for k = 1 : nFrames
-        crop = frames(cropY(k,1):cropY(k,2), cropX(k,1):cropX(k,2), :, k);
-        frames(:,:,:,k) = imresize(crop , [CROP ,CROP]);
+        res = frames(cropY(k,1):cropY(k,2), cropX(k,1):cropX(k,2), :, k);
+        retargettedFrames(:,:,:,k) = imresize(res , newSize);
     end
 
-    retargettedFrames = frames;
+%     retargettedFrames = frames;
     
 end
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % % Private Functions
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function pts = GetPointsFromSeeds(trajectories,seeds)
+
+    nFrames = size(seeds,2);
+    
+    pts = [];
+    for t = 1:nFrames
+        currentSeeds = seeds(:,t);
+        currentSeeds(~any(currentSeeds,2),:) = [];
+        for k = 1:size(currentSeeds)
+            currentTrajectory = trajectories{seeds(k,t)}.trajectory;
+            for j = 1:size(currentTrajectory,2)
+                pts = [pts; [0 int32(j+t-1) currentTrajectory(1,j) currentTrajectory(2,j)]];
+            end
+        end
+    end
+end
 
 function keyFrames = GetKeyFrames(saliencyMaps)
     saliencyMaps(saliencyMaps<0.7) = 0;
