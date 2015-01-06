@@ -46,7 +46,7 @@ function frames = ShowSaliencyPoints(moviePath , mode, saliency)
             Fy = saliencyPoints( indices , 3 );
 
             for i = 1:nrIndices
-                [cropX, cropY] = Cropper.CreateCropWindow(DOT ,DOT ,[Fx(i) Fy(i)] ,video.Width ,video.Height);
+                [cropX, cropY] = Cropper.CreateWindow(DOT ,DOT ,[Fx(i) Fy(i)] ,video.Width ,video.Height);
                 frames(cropY(1):cropY(2) ,cropX(1):cropX(2) ,:, k) = 254*ones() ;   
             end
       
@@ -59,7 +59,7 @@ function frames = ShowSaliencyPoints(moviePath , mode, saliency)
             
             Fx = avgSaliency(k,2);
             Fy = avgSaliency(k,1);
-            [cropX, cropY] = Cropper.CreateCropWindow(DOT.*7 ,DOT.*7,[Fx , Fy] , video.Width , video.Height );
+            [cropX, cropY] = Cropper.CreateWindow(DOT.*7 ,DOT.*7,[Fx , Fy] , video.Width , video.Height );
             redDot = cat( 3 , 254 * ones(cropX(1,2)-cropX(1,1)+1 , cropY(1,2)-cropY(1,1)+1), ...
                                    zeros(cropX(1,2)-cropX(1,1)+1 , cropY(1,2)-cropY(1,1)+1), ...
                                    zeros(cropX(1,2)-cropX(1,1)+1 , cropY(1,2)-cropY(1,1)+1));
@@ -90,8 +90,8 @@ frames = frames(:,:,:,1:3);
     avgSaliency = CalculateMeanSaliency(nFrames , importantPts );   
     [avgOpticalFlow] = CreateFlow(shotBoundaries, avgSaliency, frames, opticalFlowMap);
 
-    cropArray = Cropper.EstimateCropWindowSize(avgOpticalFlow, importantPts, shotBoundaries, CROP);
-    [cropX, cropY] = Cropper.CreateCropWindow( cropArray .* CROP(1,1) , cropArray .* CROP(1,2) , avgOpticalFlow(1:nFrames,:) , vidWidth , vidHeight );
+    cropArray = Cropper.GetWindowSize(avgOpticalFlow, importantPts, shotBoundaries, CROP);
+    [cropX, cropY] = Cropper.CreateWindow( cropArray .* CROP(1,1) , cropArray .* CROP(1,2) , avgOpticalFlow(1:nFrames,:) , vidWidth , vidHeight );
 
     % Create cropped movie with cropX cropY values
     for k = 1 : nFrames
@@ -101,12 +101,27 @@ frames = frames(:,:,:,1:3);
 
 end
 
-function [avg] = CalculateMeanSaliency( maxFrame  , eyes )
-    avg = [];
-    for k = 1 : maxFrame
+function avgKeys = CalculateMeanSaliency(eyes, shotBoundaries)
+    avgAll = [];
+    nFrames = eyes(end,2);
+    nShots = size(shotBoundaries,1)-1;
+    
+    for k = 1 : nFrames
         indices = find( eyes( : , 2 ) == k );
-        avg = [ avg ; mean( eyes ( indices(:) , 3:4 ) ) ];
+        
+        if isempty(indices); continue; end;
+        
+        avgAll = [ avgAll ; k mean( eyes ( indices(:) , 3:4 ) ) ];
     end   
+    
+    avgKeys = [];
+    for i = 1:nShots
+        availableFrame = min(avgAll(avgAll(:,1) >= shotBoundaries(i)));
+        maskVector = avgAll(:,1)<=(availableFrame+3) & ...
+            avgAll(:,1)>=(availableFrame);
+        avgKeys = [avgKeys;mean(avgAll(maskVector,2:3),1)];
+    end
+   
 end
 
 function [avgFlow] = CreateFlow(shotBoundaries, avgSaliency , frames , opticalFlowMap )
@@ -119,21 +134,21 @@ function [avgFlow] = CreateFlow(shotBoundaries, avgSaliency , frames , opticalFl
     end
     
     avgFlow = [];
-    nrShots = size(shotBoundaries,2)-1;
+    nrShots = size(shotBoundaries,1)-1;
+    [vidHeight,vidWidth,~,~] = size(frames);
     
     Motion = MotionFunctions;
     for k = 1:nrShots
-        shotStart = shotBoundaries(k);
-        shotEnd = shotBoundaries(k+1)-1;
 
-        shotSaliency = avgSaliency( shotStart:shotEnd , :);
-
-        [Vx,Vy] = Motion.CameraSpeed(opticalFlowMap);
-        avgFlowTmp = CalculateFlowMean( shotSaliency(1,:) , Vx ,Vy);   
-
+        [Vx,Vy] = Motion.CameraSpeed(opticalFlowMap(:,:,shotBoundaries(k):shotBoundaries(k+1)-1,:));
+        avgFlowTmp = CalculateFlowMean( avgSaliency(k,:) , Vx ,Vy);   
+        avgFlowTmp(avgFlowTmp(:,1)>vidWidth,1) = vidWidth;
+        avgFlowTmp(avgFlowTmp(:,2)>vidHeight,2) = vidHeight;
+        avgFlowTmp(avgFlowTmp<1) = 1;
         avgFlow = [avgFlow;avgFlowTmp];
     end
-
+    
+    avgFlow = [avgFlow;avgFlow(end,:)];
 end
 
 
@@ -146,12 +161,11 @@ function [avgFlow] = CalculateFlowMean(startingPoint , Vx ,Vy)
     shotLength = length(Vx);
     Y = startingPoint(1,1);
     X = startingPoint(1,2);
-    avgFlow = [Y X];
-    meanFlow = [Vy Vx];
+    avgFlow = [X Y];
+    meanFlow = [Vx Vy];
     
     for k = 2 : shotLength %dismiss the first frame of the shot since it is set to startingPoint
-        transformed = [meanFlow(k,:) 1]';
-        tmp = transformed(1:2)' + avgFlow( k-1,: );
+        tmp = meanFlow(k,:) + avgFlow( k-1,: );
         avgFlow = [avgFlow; tmp];
     end 
 end

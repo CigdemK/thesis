@@ -69,30 +69,27 @@ end
 
 function saliencyMap = Cigdem(moviePath,trajectoriesByFrame)
 
+    ImprovedT = ImprovedTrajectories;
+
     if nargin < 2
-        tic;
-        ImprovedT = ImprovedTrajectories;
-        [status,exeOutput] = ImprovedT.RunImprovedTrajectories(moviePath);toc;
-save('temp.mat');
-% load('temp.mat')
+        [status,exeOutput] = ImprovedT.RunImprovedTrajectories(moviePath);
         if status; return; end
-
-        trajectories = ImprovedT.AnalyzeOutput(exeOutput);toc;
-        trajectoriesByFrame = ImprovedT.GetTrajectoriesByFrame(trajectories);toc;
-
-        regexres = regexp(moviePath,'.avi','split');
-        mkdir(regexres{1});
-        save([regexres{1} '\ImprovedTrajectoryOriginalTJS.mat'],'trajectories','trajectoriesByFrame');
+        impTrajectories = ImprovedT.AnalyzeOutput(exeOutput);
+        save([moviePath '_impTrajectories.mat'], 'impTrajectories');
     end
     
+    trajectoryStarts = ImprovedT.GetTrajectoryStarts(trajectories);
     video = VideoReader( moviePath );
     saliencyMap = zeros(video.Height,video.Width,video.NumberOfFrames);
-    for k = 2:video.NumberOfFrames-1
+    for k = 1:video.NumberOfFrames
 
         currentSaliencyMap = zeros(video.Height,video.Width);
-
-        xIndices = round(trajectoriesByFrame{k}(1,:));
-        yIndices = round(trajectoriesByFrame{k}(2,:));
+        currentTrajs = find(trajectoryStarts==k);
+        
+        if isempty(currentTrajs); continue; end;
+        
+        xIndices = round(trajectories(currentTrajs).trajectory(1,:));
+        yIndices = round(trajectories(currentTrajs).trajectory(2,:));
 
         xIndices(xIndices<1) = 1;
         yIndices(yIndices<1) = 1;

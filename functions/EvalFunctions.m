@@ -18,12 +18,11 @@ function [ score , R ] = CalculateAUCscoreVideo( framesSaliency, framesFixation,
             save(strcat('data\R_',algorithm,'_',num2str(k),'.mat'),'R');
             R = zeros(12,2);
         end
-        
-        toc;
+
     end
-    score = 0;
-%     R = R./nFrames;
-%     score = trapz(flipdim(R(:,1),1),flipdim(R(:,2),1));
+    
+    R = R./nFrames;
+    score = trapz(flipdim(R(:,1),1),flipdim(R(:,2),1));
     
 end
 

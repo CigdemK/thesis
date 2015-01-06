@@ -17,11 +17,7 @@ function H = MyHomography(frames)
     H = zeros(3,3,nFrames);
     
     for n = 1 : nFrames-1
-        try
-            H(:,:,n) = HomographyHelper( frames(:,:,:,n), frames(:,:,:,n+1));
-        catch err
-            H(:,:,n) = zeros(3);   
-        end
+        H(:,:,n) = HomographyHelper( frames(:,:,:,n), frames(:,:,:,n+1));
     end
     H(:,:,end) = H(:,:,end-1);
     
@@ -38,7 +34,7 @@ function [opticalFlowX,opticalFlowY] = MyOpticalFlow(frames)
     for k = 1:nFrames-1
         [Vx, Vy, ~] = Coarse2FineTwoFrames(frames(:,:,:,k),frames(:,:,:,k+1),para);
         opticalFlowX(:,:,k) = Vx; 
-        opticalFlowY(:,:,k) = Vy; 
+        opticalFlowY(:,:,k) = Vy;
     end
   
     opticalFlowX(:,:,end) = opticalFlowX(:,:,end-1);
@@ -80,10 +76,7 @@ function SaveHomographyData(folderName, movieNames)
 end
 
 function [Vx,Vy] = CameraSpeed(opticalFlowMap)
-    
-%     disp('Calculating camera speed...');
-%     tic;
-    
+
     shotLength = size(opticalFlowMap,3);
     Vx = zeros(shotLength,1);
     Vy = zeros(shotLength,1);
@@ -99,19 +92,14 @@ function [Vx,Vy] = CameraSpeed(opticalFlowMap)
         meanX = mean(VxTemp(:));
         meanY = mean(VyTemp(:));
         
-        VxTemp = mean(mean([(VxTemp(:)<meanX*0.9) (VxTemp(:)>meanX*(-0.9))]));
-        VyTemp = mean(mean([(VyTemp(:)<meanY*0.9) (VyTemp(:)>meanY*(-0.9))]));
+        VxTemp = mean(mean([(VxTemp(:)<meanX*0.7) (VxTemp(:)>meanX*(-0.7))]));
+        VyTemp = mean(mean([(VyTemp(:)<meanY*0.7) (VyTemp(:)>meanY*(-0.7))]));
         Vx(t) = VxTemp;    
         Vy(t) = VyTemp;   
 
     end
-    
-    lastX = Vx( length( Vx ) );
-    lastY = Vy( length( Vy ) );
-    Vx(t+1) = lastX;
-    Vy(t+1) = lastY;
-   
-%     toc;
+    Vx(t+1) = Vx(t);
+    Vy(t+1) = Vy(t);
        
 end
 
@@ -162,19 +150,42 @@ end
 function [ H ] = HomographyHelper(img1,img2)
 % Maps the points in the second image to the first image.
 % Returns the homography matrix of img1-->img2
+% Taken from VLFeat website
 
-    I = single(rgb2gray(img1));
-    J = single(rgb2gray(img2));
 
     % Apply SIFT and find matching points
-    [features1,distances1] = vl_sift(I);
-    [features2,distances2] = vl_sift(J);
-    [matches, ~] = vl_ubcmatch(distances1,distances2,5);
+    [f1,d1] = vl_sift(single(rgb2gray(img1))) ;
+    [f2,d2] = vl_sift(single(rgb2gray(img2))) ;
+
+    [matches, ~] = vl_ubcmatch(d1,d2) ;
+
+    numMatches = size(matches,2) ;
+
+    X1 = f1(1:2,matches(1,:)) ; X1(3,:) = 1 ;
+    X2 = f2(1:2,matches(2,:)) ; X2(3,:) = 1 ;
 
     % Find transformation matrix and apply transformation
-    H = findHomography( ...
-         [features1( 1 , matches( 1 , : ) ) ; features1( 2 , matches( 1 , : ) ) ],...
-         [features2(1 , matches( 2 , : ));features2( 2 , matches( 2 , : ) ) ]);
+    clear H score ok ;
+    for t = 1:100
+        % estimate homograpyh
+        subset = vl_colsubset(1:numMatches, 4) ;
+        A = [] ;
+        for i = subset
+            A = cat(1, A, kron(X1(:,i)', vl_hat(X2(:,i)))) ;
+        end
+        [~,~,V] = svd(A) ;
+        H{t} = reshape(V(:,9),3,3) ;
+
+        % score homography
+        X2_ = H{t} * X1 ;
+        du = X2_(1,:)./X2_(3,:) - X2(1,:)./X2(3,:) ;
+        dv = X2_(2,:)./X2_(3,:) - X2(2,:)./X2(3,:) ;
+        ok{t} = (du.*du + dv.*dv) < 6*6 ;
+        score(t) = sum(ok{t}) ;
+    end
+
+    [~, best] = max(score) ;
+    H = H{best} ;
 
 end
 

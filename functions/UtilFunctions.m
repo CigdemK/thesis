@@ -5,32 +5,28 @@ function F = UtilFunctions
     F.MyGauss = @MyGauss;
     F.MyHistMatch = @MyHistMatch;
     F.DetectShotBoundaries = @DetectShotBoundaries;
+    F.ReadShotBoundaries = @ReadShotBoundaries;
 end
 
-function [bool] = CheckIsInside(center , minSize , point , maxSize)
-    bool = 1;
-    if (point(1,1) < 0) || (point(1,2) < 0) ||...
-            (point(1,1) > maxSize(1,1)) || (point(1,2) > maxSize(1,2))
-        return;
-    end
-    if (( center(1,1) + minSize(1,1) < point(1,1) ) ||...
-        ( center(1,1) - minSize(1,1) > point(1,1) ) ||...
-        ( center(1,2) + minSize(1,2) < point(1,2) ) ||...
-        ( center(1,2) - minSize(1,2) > point(1,2) ) )
-        bool = 0;
-    end
+function isReallyInside = CheckIsInside(center, points, maxSize)
+
+    tooSmallX = points(:,1) < center(1) - maxSize(1)/2;
+    tooSmallY = points(:,2) < center(2) - maxSize(2)/2;
+    tooLargeX = points(:,1) > center(1) + maxSize(1)/2;
+    tooLargeY = points(:,2) > center(2) + maxSize(2)/2;
+
+    isReallyInside = ~(tooSmallX | tooSmallY | tooLargeX | tooLargeY);
 end
 
 function [shotBoundaries] = DetectShotBoundaries( frames ) 
 
     nrFrames = size(frames,4);
-    previous = imhist(mat2gray(frames(:,:,1,1)));
-    
-    for k = 2 : nrFrames
-        current = imhist(mat2gray(frames(:,:,1,k)));
-        diff = abs(current-previous);
-        absDiff(k) = sum(diff(1));
-        previous = current;
+       
+    absDiff = zeros(nrFrames-1,1);
+    for k = 1 : nrFrames-1
+        current = imhist(mat2gray(frames(:,:,1,1)));
+        next = imhist(mat2gray(frames(:,:,1,k)));
+        absDiff(k) = sum(abs(next-current));
     end
     
     shotBoundaries = PeakFinder(absDiff , 6*mean(absDiff));
@@ -42,6 +38,15 @@ function [shotBoundaries] = DetectShotBoundaries( frames )
     else
         shotBoundaries = [1;shotBoundaries'];
     end
+end
+
+function [shotBoundaries] = ReadShotBoundaries( videoPath, nFrames )
+    
+    shotPath = strrep(videoPath, 'AVIClips', 'ShotBounds');
+    shotPath = strrep(shotPath, 'avi', 'sht');
+    
+    shotBoundaries = load(shotPath);
+    shotBoundaries = [1;shotBoundaries';nFrames];
 end
 
 function varargout = PeakFinder(x0, sel, thresh, extrema, include_endpoints)

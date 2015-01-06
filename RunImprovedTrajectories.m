@@ -34,9 +34,8 @@ movieNames = {'F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00
 tic;
 sal = ImageSaliency;
 for i = 1:size(movieNames,2)
-    fileName = movieNames{i}
-    regexres = regexp(fileName,'.avi','split');
-    if ~exist([regexres{1} '\ImprovedTrajectoryOriginalTJS.mat'], 'file')
+    fileName = movieNames{i};
+    if ~exist([fileName '_impTrajectories.mat'], 'file')
         saliencyMap = sal.Cigdem(fileName);
     end
     toc;

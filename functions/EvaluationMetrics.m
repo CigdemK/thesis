@@ -6,7 +6,7 @@ function F = EvaluationMetrics
     F.CompressVideo = @CompressVideo;
     F.MDE = @MDE;
     F.MUSE = @MUSE;
-    F.Shakiness = @Shakiness;
+    F.JerkinessMatlab = @JerkinessMatlab;
     F.DivisiveNormalization = @DivisiveNormalization;
     F.MetrixMuxMSE = @MetrixMuxMSE;
     F.MetrixMuxPSNR = @MetrixMuxPSNR;
@@ -22,7 +22,7 @@ function F = EvaluationMetrics
     F.MetrixMuxIFC = @MetrixMuxIFC;
 end
 
-function D = Shakiness(videoPath,frames)
+function D = JerkinessMatlab(videoPath,frames)
     
     if nargin < 2
         video=VideoReader(videoPath);
@@ -33,7 +33,6 @@ function D = Shakiness(videoPath,frames)
     frames = mat2gray(frames);
     
     D = zeros(nFrames,1);
-    tic;
     for i = 1:nFrames-1    
         
         ptThresh = 0.1;
@@ -46,10 +45,11 @@ function D = Shakiness(videoPath,frames)
         points2 = points2(indexPairs(:, 2), :);
         avg = mean(abs(points1.Location-points2.Location));
         D(i) = sqrt(avg(1)^2+avg(2)^2);
-        toc;
+
     end
     
 end
+
 function D = MUSE(videoPath,frames)
     
     if nargin < 2

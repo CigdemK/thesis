@@ -6,7 +6,7 @@ end
 % PUBLIC FUNCTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [videoSaliencyMap , opticalFlowMap ] = Nguyen2013(moviePath,frames)
+function [videoSaliencyMap , opticalFlow, staticSaliency] = Nguyen2013(moviePath,frames)
 
     if nargin < 2
         video = VideoReader( moviePath );
@@ -16,25 +16,25 @@ function [videoSaliencyMap , opticalFlowMap ] = Nguyen2013(moviePath,frames)
     [vidHeight, vidWidth, ~, nFrames] = size(frames);
     videoSaliencyMap = zeros(vidHeight,vidWidth,nFrames);
     
-    Motion = MotionFunctions;
-    H = Motion.MyHomography(frames); 
+    Motion = MotionFunctions;tic;
+    H = Motion.MyHomography(frames);
     [opticalFlowMapX, opticalFlowMapY] = Motion.MyOpticalFlow(frames);
-    opticalFlowMap = cat(4,opticalFlowMapX,opticalFlowMapY);
-    save('opticalFlowMap.mat','opticalFlowMap');
-%     StaticSal = ImageSaliency;
-%     staticSaliency = StaticSal.MyJudd('',frames);
-    load('saliencyMaps.mat');
-    staticSaliency = saliencyMaps;
+    opticalFlow = cat(4,opticalFlowMapX,opticalFlowMapY);toc;
+%     load([moviePath '_opticalFlow.mat']);
+%     opticalFlowMapX = opticalFlow(:,:,:,1);
+%     opticalFlowMapY = opticalFlow(:,:,:,2);
+    StaticSal = ImageSaliency;
+    staticSaliency = StaticSal.MyJudd('',frames);toc;
+%     load([moviePath '_staticSaliencyMap.mat']);
     
     load('../myData/f_w.mat');
-    tic;
     for n = 1 : nFrames-1
         
         dynamicSaliency = sqrt( opticalFlowMapX(:,:,n) .^ 2 + opticalFlowMapY(:,:,n) .^ 2 );
         dynamicSaliency = dynamicSaliency/max(max(dynamicSaliency));
         currentStaticSaliency = staticSaliency(:,:,n)/max(max(staticSaliency(:,:,n)));
 
-%         Divide into patches
+%       Divide into patches
         i=1;
         nrPatches = floor( vidHeight / 9 )*floor( vidWidth / 9 );
         xy = zeros(nrPatches,2);
@@ -75,12 +75,10 @@ function [videoSaliencyMap , opticalFlowMap ] = Nguyen2013(moviePath,frames)
 
             end
         end
-        toc;
         videoSaliencyMap(:,:,n) = currentFrame;
     end
-    videoSaliencyMap = mat2gray(videoSaliencyMap);
-    save('Nguyen2013.mst','videoSaliencyMap','opticalFlowMap');
-%     load('../CAMO_Videos/Dolly/Dolly0011.avi.mat');
+    videoSaliencyMap = mat2gray(videoSaliencyMap); toc;
+    
 end
 
 

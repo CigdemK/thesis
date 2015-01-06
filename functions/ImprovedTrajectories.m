@@ -1,10 +1,9 @@
 function F = ImprovedTrajectories
     F.RunImprovedTrajectories = @RunImprovedTrajectories;
     F.AnalyzeOutput = @AnalyzeOutput;
-    F.GetTrajectoriesByFrame = @GetTrajectoriesByFrame;
     F.GroupTrajectoriesManual = @GroupTrajectoriesManual;
     F.GroupTrajectoriesKmeans = @GroupTrajectoriesKmeans;
-    F.GetSeedTrajectoriesFromKeyFrames = @GetSeedTrajectoriesFromKeyFrames;
+    F.GetSeedTrjs = @GetSeedTrjs;
     F.PlotSeeds = @PlotSeeds;
     F.PlotGroups = @PlotGroups;
     F.PlotAllTrajectories = @PlotAllTrajectories;
@@ -25,7 +24,6 @@ function trajectories = AnalyzeOutput(exeOutput)
     tempTrajectories = regexp(exeOutput,'\n','split');
     numberOfTrajectories = size(tempTrajectories,2);
 
-    trajectories = cell(numberOfTrajectories-2,1);
     Util = UtilFunctions;
     for k = 1:numberOfTrajectories-2 % the last element is empty, and the previous one contains info about the movie
 
@@ -64,115 +62,150 @@ function trajectories = AnalyzeOutput(exeOutput)
 %         currentTrajectory.MBHx      = reshape(  currentTempTrajectory( trajectoryLenght+215 : trajectoryLenght+310 ) , [8 2 2 3] ); %(default 96 dimension)
 %         currentTrajectory.MBHy      = reshape(  currentTempTrajectory( trajectoryLenght+311 : trajectoryLenght+406 ) , [8 2 2 3] ); %(default 96 dimension)
 
-        trajectories{k} = currentTrajectory;
+        trajectories(k) = currentTrajectory;
     end
 
 end
 
-function trajectoriesByFrame = GetTrajectoriesByFrame(trajectories)
-
-    if isempty(trajectories); error('ImpTrajectories:propertyCheck', 'First run ''AnalyzeOutput'' function.'); end
-
-    numberOfTrajectories = size(trajectories,1);
-    numberOfFrames = trajectories{end}.frameNum + 1;
-    trajectoriesByFrame = cell(numberOfFrames,1);
-
-    for i = 1: numberOfTrajectories
-
-        currentTrajectory = trajectories{i};
-        trajectoryLength = size(currentTrajectory.trajectory,2);
-        
-        if trajectoryLength < 25; return; end
-        
-        trajectoryEnd = currentTrajectory.frameNum;
-        trajectoryStart = trajectoryEnd - trajectoryLength + 1; 
-
-        for k = 1 : trajectoryLength
-
-            currentFrame = trajectoryStart + k ;
-            descriptor = [ currentTrajectory.trajectory(1,k); ...
-                           currentTrajectory.trajectory(2,k) ];
-
-%             if ~isempty(trajectoriesByFrames{currentFrame}); trajectoriesByFrames{currentFrame} = []; end
-            trajectoriesByFrame{currentFrame} = [trajectoriesByFrame{currentFrame} , descriptor];
-
-        end
-
-    end
-
+function trjStarts = GetTrajectoryStarts(trajectories)
+    trajectoryLengths = arrayfun(@(X)size(trajectories(X).trajectory,2),1:nTrajectories);
+    trajectoryEnds = [trajectories.frameNum];
+    trjStarts = trajectoryEnds - trajectoryLengths + 1;
 end
 
-function seeds= GetSeedTrajectoriesFromKeyFrames(trajectories, saliencyMap, shotBoundaries, adjacencyDistance)
+function seeds = GetSeedTrjs(trajectories,keyFrames,shotBoundaries,staticSaliency,adjacencyDistance)
 
-    if nargin < 4
-        adjacencyDistance = 20;
+    if nargin < 5
+        adjacencyDistance = 10;
     end
 
-    nFrames = trajectories{end}.frameNum;
+    nFrames = trajectories(end).frameNum;
+    nTrajectories = size(trajectories,2);
+    nShots = size(shotBoundaries,1)-1;
+    
+    staticSaliency(staticSaliency<0.9) = 0;
   
     % Group trajectories according to their start frame
-    accordingToStart = cell(nFrames,1);
-    for i = 1:nFrames; accordingToStart{i} = []; end
-    for k = 1:size(trajectories,1)
-
-        currentTrajectory = trajectories{k};
-
-        trajectoryLength = size(currentTrajectory.trajectory,2);
-        trajectoryEnd = currentTrajectory.frameNum;
-        trajectoryStart = trajectoryEnd - trajectoryLength + 1;
-
-        if trajectoryStart > shotBoundaries(1) && trajectoryEnd < shotBoundaries(2)
-            accordingToStart{trajectoryStart - shotBoundaries(1)}(end+1) = k;
-        end
+    trajectoryStarts = GetTrajectoryStarts(trajectories);
+    
+    % Get valid trajectories (remove inter-shot trajectories)
+    isInsideShotBoundaries = arrayfun(@(X)(trajectoryStarts > shotBoundaries(X) & ...
+        trajectoryEnds < shotBoundaries(X+1)),1:nShots,'UniformOutput',false);
+    isInsideShotBoundaries = any(cell2mat(isInsideShotBoundaries'),1);
+    validTrajectoryIndices = find(isInsideShotBoundaries)';
+    trajectoryStarts = trajectoryStarts(isInsideShotBoundaries)'; 
+    nTrajectories = size(trajectories,2);
+    
+    % Get seed trajectories from key frames
+    seeds = [];
+    seedStarts = [];
+    for k = 1:size(keyFrames,1)
         
-%         % Find l1 distance of x,y points to the left-top corner
-%         tr = currentTrajectory.trajectory;
-%         currentTrajectory.distance = sqrt(tr(1,:).^2 + tr(2,:).^2);
-
-    end
-
-    % Find seed trajectories that starts from first frame
-    seeds = zeros(10000,nFrames);
-    seeds(1,:) = 2;
-
-    currentStart = accordingToStart{1};
-    for i = 1:size(currentStart,2)
-        traj = trajectories{currentStart(i)}; 
-        if saliencyMap(round(traj.mean_y),round(traj.mean_x))
-            seeds(seeds(1,1),1) = currentStart(i);
-            seeds(1,1) = seeds(1,1) + 1;
-        end
+        currentFrame = keyFrames(k);
+        
+        % Get trajectories that can touch current key frame
+        possibleTrajs = find(trajectoryStarts>=currentFrame-12 & ...
+            trajectoryStarts<=currentFrame);
+        possibleStarts = trajectoryStarts(possibleTrajs);
+        possibleTrajs = validTrajectoryIndices(possibleTrajs);
+        nrIndices = size(possibleTrajs,1);
+        
+        % Get positions of these trajectories on current key frame
+        currentX = arrayfun(@(X)trajectories(possibleTrajs(X)).trajectory( ...
+            2,currentFrame-possibleStarts(X)+1),1:nrIndices);
+        currentY = arrayfun(@(X)trajectories(possibleTrajs(X)).trajectory( ...
+            1,currentFrame-possibleStarts(X)+1),1:nrIndices);
+        currentX = floor(currentX)';
+        currentY = floor(currentY)';
+        currentX(currentX==0) = 1;
+        currentY(currentY==0) = 1;
+        
+        % Select trajectories that pass through salient regions on keyframe
+        salientTrajectories = cell2mat(arrayfun(@(X)staticSaliency(currentY(X),currentX(X),k),...
+            1:nrIndices,'UniformOutput',false));
+        seeds = [seeds;possibleTrajs(find(salientTrajectories))];
+        seedStarts = [seedStarts;possibleStarts(find(salientTrajectories))];
+        
     end
 
     % Find seed trajectories from ramaining frames
-    for k = 2:size(accordingToStart,1)
-        currentStart = accordingToStart{k};
-        for i = 1:5:size(currentStart,2)
+    for t = 1:2
+        for k = 1:nFrames
 
-            traj = trajectories{currentStart(i)}.trajectory; 
+            % Get trajectories starting at current frame
+            possibleTrajs = validTrajectoryIndices(trajectoryStarts==k);
+            possibleTrajsStarts = trajectoryStarts(trajectoryStarts==k);
+            nrTrajs = size(possibleTrajs,1);
+            if ~nrTrajs; continue; end;
 
-            % Check seeds of the previous n frames
-            for j = 1:10
-                if k > j
-                    for t = 2:seeds(1,k-j)-1
-                        seed = trajectories{seeds(t,k-j)}.trajectory;
-                        distancex = mean(abs(traj(2,1:end-j) - seed(2,j+1:end)));
-                        distancey = mean(abs(traj(1,1:end-j) - seed(1,j+1:end)));
-                        distance = sqrt(distancex^2+distancey^2);
-                        if distance < adjacencyDistance
-                            seeds(seeds(1,k),k) = currentStart(i);
-                            seeds(1,k) = seeds(1,k) + 1;
-                            break;
-                        end
-                    end
-                end
-            end
-        end
+            % Get trajectory data of found trajectories
+            possibleTrajsData   = [trajectories(possibleTrajs).trajectory]';
+            possibleTrajsX      = reshape(possibleTrajsData(:,1),[13,size(possibleTrajsData,1)/13])'; 
+            possibleTrajsY      = reshape(possibleTrajsData(:,2),[13,size(possibleTrajsData,1)/13])'; 
+
+            % Get seeds from upcoming 10 frames
+            possibleSeeds       = arrayfun(@(X)seeds(seedStarts==(k+X)),0:9, 'UniformOutput', false);
+            possibleSeedStarts  = arrayfun(@(X)seedStarts(seedStarts==(k+X)),0:9, 'UniformOutput', false);
+            possibleSeeds       = cell2mat(possibleSeeds(:));
+            possibleSeedStarts  = cell2mat(possibleSeedStarts(:));
+            nrSeeds             = size(possibleSeeds,1);
+            if ~nrSeeds; continue; end;
+
+            % Get trajectory data of seeds
+            possibleSeedsData   = [trajectories(possibleSeeds).trajectory]';
+            possibleSeedsX      = reshape(possibleSeedsData(:,1),[13,size(possibleSeedsData,1)/13])'; 
+            possibleSeedsY      = reshape(possibleSeedsData(:,2),[13,size(possibleSeedsData,1)/13])';
+
+            % Get the difference between seed starts and current frame
+            possibleStartDiff = possibleSeedStarts-k;
+
+            % Get overlaping portions of seeds with trajectories
+            possibleSeedsX = cell2mat(arrayfun(@(X)[ possibleSeedsX(X,1:end-possibleStartDiff(X))'; ...
+                zeros(possibleStartDiff(X),1)], 1:nrSeeds,'uni',false))';
+            possibleSeedsY = cell2mat(arrayfun(@(X)[ possibleSeedsY(X,1:end-possibleStartDiff(X))'; ...
+                zeros(possibleStartDiff(X),1)], 1:nrSeeds,'uni',false))';
+
+            possibleSeedsX = repmat(possibleSeedsX,[1,1,nrTrajs]);
+            possibleSeedsY = repmat(possibleSeedsY,[1,1,nrTrajs]);
+
+            possibleSeedsX = permute(possibleSeedsX,[3 2 1]);
+            possibleSeedsY = permute(possibleSeedsY,[3 2 1]);
+
+            % Calculate the distance of current trajectories with seeds
+            possibleTrajsX = repmat(possibleTrajsX,[1,1,nrSeeds]);
+            possibleTrajsY = repmat(possibleTrajsY,[1,1,nrSeeds]);
+
+            possibleTrajsX = cell2mat(arrayfun(@(X)[possibleTrajsX(:,possibleStartDiff(X)+1:end,1),...
+                zeros(nrTrajs,possibleStartDiff(X))], 1:nrSeeds,'uni',false)');
+            possibleTrajsY = cell2mat(arrayfun(@(X)[possibleTrajsY(:,possibleStartDiff(X)+1:end,1),...
+                zeros(nrTrajs,possibleStartDiff(X))], 1:nrSeeds,'uni',false)');
+
+            possibleTrajsX = reshape(possibleTrajsX,[nrTrajs nrSeeds 13]);
+            possibleTrajsY = reshape(possibleTrajsY,[nrTrajs nrSeeds 13]);
+
+            possibleTrajsX = permute(possibleTrajsX,[1 3 2]);
+            possibleTrajsY = permute(possibleTrajsY,[1 3 2]);
+
+            distanceX = possibleTrajsX - possibleSeedsX;
+            distanceY = possibleTrajsY - possibleSeedsY;
+
+            distanceX(distanceX==0) = nan;
+            distanceX = nanmean(distanceX,2);
+            distanceY(distanceY==0) = nan;
+            distanceY = nanmean(distanceY,2);
+
+            distance = sqrt(distanceX.^2+distanceY.^2); 
+            
+            [trajInd,~] = ind2sub([nrTrajs nrSeeds], find(distance < adjacencyDistance));
+
+            seeds = [seeds;possibleTrajs(unique(trajInd,'rows'))];
+            seedStarts = [seedStarts;possibleTrajsStarts(unique(trajInd,'rows'))];
+
+        end 
     end
-    seeds(1,:) = [];
-%     seeds = seeds(:);
-    seeds(~any(seeds,2),:) = []; %remove rows
- 
+   
+    seeds = unique(seeds,'rows');
+
 end
 
 function groups = GroupTrajectoriesManual(trajectories, shotBoundaries, adjacencyDistance)
@@ -326,7 +359,7 @@ function PlotSeeds(trajectories,seeds)
 
     for k = 1:size(seeds,1)
 
-        currentTrajectory = trajectories{seeds(k)};
+        currentTrajectory = trajectories(seeds(k));
         tr = currentTrajectory.trajectory;
         trajectoryLength = size(currentTrajectory.trajectory,2);
         trajectoryEnd = currentTrajectory.frameNum;
@@ -337,9 +370,11 @@ function PlotSeeds(trajectories,seeds)
             tr(1,:),'LineWidth',2);
 
     end
-    xlim([1 576])
+%     xlim([1 320])
+%     ylim([1 114])
+%     zlim([1 240])
 %     ylim([1 (trajectoryEnd-trajectoryStart)])
-    set(gca, 'XTick', [], 'YTick', [], 'ZTick', []);
+%     set(gca, 'XTick', [], 'YTick', [], 'ZTick', []);
     xlabel('Video Width','FontWeight','Bold');
     ylabel('Time / Frames','FontWeight','Bold');
     zlabel('Video Height','FontWeight','Bold');
@@ -402,3 +437,35 @@ function PlotAllTrajectories(trajectories,shotBoundaries)
 
 end
 
+% function trajectoriesByFrame = GetTrajectoriesByFrame(trajectories)
+% 
+%     if isempty(trajectories); error('ImpTrajectories:propertyCheck', 'First run ''AnalyzeOutput'' function.'); end
+% 
+%     numberOfTrajectories = size(trajectories,2);
+%     numberOfFrames = trajectories(end).frameNum + 1;
+%     trajectoriesByFrame = cell(numberOfFrames,1);
+% 
+%     for i = 1: numberOfTrajectories
+% 
+%         currentTrajectory = trajectories(i);
+%         trajectoryLength = size(currentTrajectory.trajectory,2);
+%         
+% %         if trajectoryLength < 25; return; end
+%         
+%         trajectoryEnd = currentTrajectory.frameNum;
+%         trajectoryStart = trajectoryEnd - trajectoryLength + 1; 
+% 
+%         for k = 1 : trajectoryLength
+% 
+%             currentFrame = trajectoryStart + k ;
+%             descriptor = [ currentTrajectory.trajectory(1,k); ...
+%                            currentTrajectory.trajectory(2,k) ];
+% 
+% %             if ~isempty(trajectoriesByFrames{currentFrame}); trajectoriesByFrames{currentFrame} = []; end
+%             trajectoriesByFrame{currentFrame} = [trajectoriesByFrame{currentFrame} , descriptor];
+% 
+%         end
+% 
+%     end
+% 
+% end
