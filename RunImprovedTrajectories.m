@@ -38,7 +38,6 @@ for i = 1:size(movieNames,2)
     if ~exist([fileName '_impTrajectories.mat'], 'file')
         saliencyMap = sal.Cigdem(fileName);
     end
-    toc;
 end
     
     

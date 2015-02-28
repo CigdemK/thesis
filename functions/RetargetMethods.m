@@ -2,8 +2,16 @@ function F = RetargetMethods
     F.Rubinstein2009 = @Rubinstein2009;
     F.Yan2013_Mine = @Yan2013_Mine;
     F.Yan2013 = @Yan2013;
+    F.Wang2011 = @Wang2011;
     F.LinearScaling = @LinearScaling;
     F.Cigdem = @Cigdem;
+    F.GetKeyFrames = @GetKeyFrames;
+    F.GetPointsFromSeeds = @GetPointsFromSeeds;
+end
+
+function retargetedFrames = Wang2011(frames,newSize) 
+    wang = WANGFunctions;
+    retargetedFrames = wang.PerFrameOptimization(frames, newSize);
 end
 
 function retargettedFrames = Rubinstein2009(originalFrames,newSize)
@@ -198,7 +206,6 @@ function retargettedFrames = Cigdem(videoPath,frames,newSize)
     frames = Cropper.RemoveBlackBars(frames);
     [vidHeight,vidWidth,~,nFrames] = size(frames);
     shotBoundaries = Util.ReadShotBoundaries(videoPath,nFrames);
-    cropRatio = [newSize(1)/vidHeight newSize(2)/vidWidth];
  
 %     % Calculate saliency & optical flow maps & trajectories
 %     [videoSaliency , opticalFlow, staticSaliency] = VideoSal.Nguyen2013('',frames);
@@ -220,8 +227,8 @@ function retargettedFrames = Cigdem(videoPath,frames,newSize)
     % Get important parts with key frames and trajectories
     keyFrames = GetKeyFrames(staticSaliency,shotBoundaries); 
 
-    seeds     = ImpTrjs.GetSeedTrjs(impTrajectories,keyFrames,shotBoundaries,staticSaliency(:,:,keyFrames)); toc;
-    impPts    = GetPointsFromSeeds(impTrajectories,seeds); toc;
+    seeds     = ImpTrjs.GetSeedTrjs(impTrajectories,keyFrames,shotBoundaries,staticSaliency(:,:,keyFrames)); 
+    impPts    = GetPointsFromSeeds(impTrajectories,seeds);
 
     % Apply cropping
     avgSaliency     = Ali.CalculateMeanSaliency(impPts, shotBoundaries );  toc; 
@@ -238,10 +245,6 @@ function retargettedFrames = Cigdem(videoPath,frames,newSize)
     end
 
 end
-
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% % Private Functions
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function pts = GetPointsFromSeeds(trajectories,seeds)
 
@@ -284,6 +287,10 @@ function keyFrames = GetKeyFrames(saliencyMaps,shotBoundaries)
     end
 
 end
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % Private Functions
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function dispersion = CalculateDispersion(videoSaliency,threshold)
 

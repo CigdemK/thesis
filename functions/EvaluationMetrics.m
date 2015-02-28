@@ -52,22 +52,6 @@ end
 
 function D = MUSE(videoPath,frames)
     
-    if nargin < 2
-        video=VideoReader(videoPath);
-        frames = read(video);
-    end
-
-    nFrames = size(frames,4);
-    
-    D = zeros(nFrames,1);
-    parameterfile = 'C:\Program Files\MATLAB\R2014a\toolbox\flow_based_superpixel_benchmark_1_0\configs\box.yaml';
-    tic;
-    for i = 1:nFrames-1
-        main_runKittiBenchmarkMDE(parameterfile,frames(:,:,:,i),frames(:,:,:,i+1));
-        avgMDE = main_evaluateKittiBenchmarkMDE(parameterfile,frames(:,:,:,i),frames(:,:,:,i+1));
-        D(i) = avgMDE.meanRatio;
-    end
-    
 end
 
 function D = MDE(videoPath,frames)
@@ -81,7 +65,6 @@ function D = MDE(videoPath,frames)
     
     D = zeros(nFrames,1);
     parameterfile = 'C:\Program Files\MATLAB\R2014a\toolbox\flow_based_superpixel_benchmark_1_0\configs\box.yaml';
-    tic;
     for i = 1:nFrames-1
         main_runKittiBenchmarkMDE(parameterfile,frames(:,:,:,i),frames(:,:,:,i+1));
         avgMDE = main_evaluateKittiBenchmarkMDE(parameterfile,frames(:,:,:,i),frames(:,:,:,i+1));
@@ -363,7 +346,7 @@ function D = DivisiveNormalization(videoPath,frames)
     end
    
     nFrames = size(frames,4);
-    
+
     D = zeros(nFrames,1);
     for i = 1:nFrames-1
         [d,~,~] = div_norm_metric(frames(:,:,:,i),frames(:,:,:,i+1));

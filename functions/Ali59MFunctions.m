@@ -9,7 +9,7 @@ end
 % % Public Functions
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function frames = ShowSaliencyPoints(moviePath , mode, saliency) 
+function frames = ShowSaliencyPoints(moviePath , mode, saliency, saliencyPoints) 
 %mode = 'all' or 'mean', saliency = 'gaze' or 'estimate'   
 
     if nargin < 3
@@ -33,37 +33,43 @@ function frames = ShowSaliencyPoints(moviePath , mode, saliency)
         saliencyPoints = AITE.CalculateMapping(resultMap);
     end
 
-    DOT = repmat(0.5,video.NumberOfFrames,1);
     Cropper = CropFunctions;
     if strcmp( mode , 'all' )
         
         for k = 1 : video.NumberOfFrames
 
             indices = find( saliencyPoints( : , 2 ) == k );
-            nrIndices = length(indices);
+            nrIndices = size(indices,1);
+            
+            if nrIndices == 0; continue; end;
 
             Fx = saliencyPoints( indices , 4 );
             Fy = saliencyPoints( indices , 3 );
-
+            redDot = cat( 3 , 254 * ones(6),zeros(6),zeros(6));
+            
             for i = 1:nrIndices
-                [cropX, cropY] = Cropper.CreateWindow(DOT ,DOT ,[Fx(i) Fy(i)] ,video.Width ,video.Height);
-                frames(cropY(1):cropY(2) ,cropX(1):cropX(2) ,:, k) = 254*ones() ;   
+                [cropX, cropY] = Cropper.CreateWindow([5 5] , [1 2], [Fx(i) Fy(i)] , [video.Width video.Height]);
+                frames(cropY(1,1):cropY(1,2) ,cropX(1,1):cropX(1,2) ,:, k) = redDot ;   
             end
       
         end
         
     elseif strcmp( mode , 'mean' )
         
-        avgSaliency = CalculateMeanSaliency(video.NumberOfFrames ,saliencyPoints);
+        if strcmp( saliency , 'given' ) 
+            avgSaliency = saliencyPoints;
+        else
+            avgSaliency = CalculateMeanSaliency(video.NumberOfFrames ,saliencyPoints);
+        end
+        
+        redDot = cat( 3 , 254 * ones(16),zeros(16),zeros(16));
+        
         for k = 1 : video.NumberOfFrames
             
             Fx = avgSaliency(k,2);
             Fy = avgSaliency(k,1);
-            [cropX, cropY] = Cropper.CreateWindow(DOT.*7 ,DOT.*7,[Fx , Fy] , video.Width , video.Height );
-            redDot = cat( 3 , 254 * ones(cropX(1,2)-cropX(1,1)+1 , cropY(1,2)-cropY(1,1)+1), ...
-                                   zeros(cropX(1,2)-cropX(1,1)+1 , cropY(1,2)-cropY(1,1)+1), ...
-                                   zeros(cropX(1,2)-cropX(1,1)+1 , cropY(1,2)-cropY(1,1)+1));
-            frames(cropY(1):cropY(2), cropX(1):cropX(2), :, k) = redDot; 
+            [cropX, cropY] = Cropper.CreateWindow([15 15],[1 2],[Fx  Fy] , [video.Width  video.Height] );
+            frames(cropY(1,1):cropY(1,2) ,cropX(1,1):cropX(1,2) ,:, k) = redDot ;
         
         end
 
@@ -184,34 +190,4 @@ function importantPts = ThresholdSaliency(saliencyMap)
 
 end
 
-% function CropWithHomography(FolderName, FileName , CROP , RATIO , mode) %mode = 'optical', 'saliency' or 'homography'
-% 
-%     Reader = ReadFunctions;
-%     [video,nFrames,vidHeight,vidWidth,vidFPS] = Reader.ReadData(FolderName,FileName);
-%     fprintf('Number of frames = %d\n',nFrames);
-% 
-%     % Create movie structure & find optical flow per shot
-%     mov = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);
-%     mov = Reader.ReadMovie(mov , video );
-% 
-%     Video = VideoFunctions;
-%     saliencyPoints = Video.CalculateStaticSaliency(mov);
-%     avgSaliency = Video.CalculateMeanSaliency( nFrames , saliencyPoints );
-%     shotBoundaries = Video.DetectShotBoundaries( mov );
-%     [avgFlowOptical_h] = Video.CreateFlow( mode , shotBoundaries , avgSaliency , mov , 4 ); % 'saliency' or 'optical' or 'homography'
-% 
-%     Cropper = CropFunctions;
-%     cropArray = Cropper.EstimateWindowSize(avgFlowOptical_h, saliencyPoints , shotBoundaries , CROP , RATIO , [vidWidth vidHeight]);
-%     [cropX, cropY] = Cropper.CreateWindow( cropArray .* RATIO(1,1) , cropArray .* RATIO(1,2) , avgFlowOptical_h(1:nFrames,:) , vidWidth , vidHeight );
-%     
-%     % Create cropped movie with cropX cropY values
-%     movCropped = Reader.NewMovie(nFrames , vidHeight   ,vidWidth);
-%     for k = 1 : nFrames
-%         crop = mov(k).cdata( cropY(k,1):cropY(k,2) , cropX(k,1):cropX(k,2) , : );
-%         movCropped(k).cdata = imresize(crop , [CROP.*RATIO(1,2)*2 ,CROP.*RATIO(1,1)*2]);
-%     end
-% 
-%     % Save the output
-%     movie2avi(movCropped, strcat(FolderName , FileName,'_cropped_optical.avi') , 'fps',  vidFPS);
-% 
-% end
+

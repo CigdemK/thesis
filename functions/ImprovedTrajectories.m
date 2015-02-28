@@ -6,7 +6,7 @@ function F = ImprovedTrajectories
     F.GetSeedTrjs = @GetSeedTrjs;
     F.PlotSeeds = @PlotSeeds;
     F.PlotGroups = @PlotGroups;
-    F.PlotAllTrajectories = @PlotAllTrajectories;
+    F.PlotAllTrajectories = @PlotAllTrajectories;    
 end
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -67,12 +67,6 @@ function trajectories = AnalyzeOutput(exeOutput)
 
 end
 
-function trjStarts = GetTrajectoryStarts(trajectories)
-    trajectoryLengths = arrayfun(@(X)size(trajectories(X).trajectory,2),1:nTrajectories);
-    trajectoryEnds = [trajectories.frameNum];
-    trjStarts = trajectoryEnds - trajectoryLengths + 1;
-end
-
 function seeds = GetSeedTrjs(trajectories,keyFrames,shotBoundaries,staticSaliency,adjacencyDistance)
 
     if nargin < 5
@@ -80,13 +74,15 @@ function seeds = GetSeedTrjs(trajectories,keyFrames,shotBoundaries,staticSalienc
     end
 
     nFrames = trajectories(end).frameNum;
-    nTrajectories = size(trajectories,2);
     nShots = size(shotBoundaries,1)-1;
+    nTrajectories = size(trajectories,2);
     
-    staticSaliency(staticSaliency<0.9) = 0;
+    staticSaliency(staticSaliency<0.7) = 0;
   
     % Group trajectories according to their start frame
-    trajectoryStarts = GetTrajectoryStarts(trajectories);
+    trajectoryLengths = arrayfun(@(X)size(trajectories(X).trajectory,2),1:nTrajectories);
+    trajectoryEnds = [trajectories.frameNum];
+    trajectoryStarts = trajectoryEnds - trajectoryLengths + 1;
     
     % Get valid trajectories (remove inter-shot trajectories)
     isInsideShotBoundaries = arrayfun(@(X)(trajectoryStarts > shotBoundaries(X) & ...
@@ -419,9 +415,10 @@ end
 
 function PlotAllTrajectories(trajectories,shotBoundaries)
 
-    for k = 1:100:size(trajectories,1)
+    h1 = figure;
+    for k = 1:100:size(trajectories,2)
 
-        currentTrajectory = trajectories{k};
+        currentTrajectory = trajectories(k);
         tr = currentTrajectory.trajectory;
 
         trajectoryLength = size(tr,2);
@@ -431,10 +428,10 @@ function PlotAllTrajectories(trajectories,shotBoundaries)
         if (trajectoryEnd > shotBoundaries(2)) || (trajectoryStart < shotBoundaries(1)); continue; end
 
         hold on;
-        plot3(tr(2,:),(trajectoryStart-1)*10:10:(trajectoryEnd-1)*10,tr(1,:),'r')
-%         plot(tr(2,:),(trajectoryStart-1)*10:10:(trajectoryEnd-1)*10,'x')
+%         plot3(tr(2,:),(trajectoryStart-1)*10:10:(trajectoryEnd-1)*10,tr(1,:),'r')
+        plot(tr(2,:),(trajectoryStart-1)*10:10:(trajectoryEnd-1)*10,'Color','r','linewidth',3)
     end
-
+    print(h1,'-djpeg','-r150','aerialtrjs.jpg');
 end
 
 % function trajectoriesByFrame = GetTrajectoriesByFrame(trajectories)

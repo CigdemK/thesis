@@ -6,6 +6,23 @@ function F = UtilFunctions
     F.MyHistMatch = @MyHistMatch;
     F.DetectShotBoundaries = @DetectShotBoundaries;
     F.ReadShotBoundaries = @ReadShotBoundaries;
+    F.RecursiveStructTraverse = @RecursiveStructTraverse;
+end
+
+function res = RecursiveStructTraverse(a)
+    
+    res = cell(1);
+    % recursive part
+    if isstruct(a) 
+        topNames = fieldnames(a);
+        for i = 1:numel(topNames)
+            res{end+1} = RecursiveStructTraverse(a.(topNames{i}));
+        end
+        res = FlattenCellArray(res);
+    else % baseline
+        res = a;
+    end
+    
 end
 
 function isReallyInside = CheckIsInside(center, points, maxSize)
@@ -311,7 +328,7 @@ function C = FlattenCellArray(A)
         if(~iscell(A{i}))
             C = [C,A{i}];
         else
-           Ctemp = flattenCellArray(A{i});
+           Ctemp = FlattenCellArray(A{i});
            C = [C,Ctemp{:}];
 
         end

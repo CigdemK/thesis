@@ -4,21 +4,14 @@ function F = EvalFunctions
     F.ReadRValuesFromFiles = @ReadRValuesFromFiles;
 end
 
-function [ score , R ] = CalculateAUCscoreVideo( framesSaliency, framesFixation,algorithm )
-    tic;
-    nFrames = size(framesSaliency,2);
+function [ score , R ,ind] = CalculateAUCscoreVideo( framesSaliency, framesFixation)
+
+    nFrames = size(framesSaliency,3);
 
     R = zeros(12,2);
     for k = 1:nFrames
-        
-        [~,currentR] = CalculateAUCscoreFrame( framesSaliency{k}, framesFixation{k} );
+        [~,currentR] = CalculateAUCscoreFrame( framesSaliency(:,:,k), framesFixation(:,:,k) );
         R = R + currentR;
-        
-        if mod(k, 100) == 0
-            save(strcat('data\R_',algorithm,'_',num2str(k),'.mat'),'R');
-            R = zeros(12,2);
-        end
-
     end
     
     R = R./nFrames;
@@ -48,8 +41,8 @@ function [ score , R ] = CalculateAUCscoreFrame( salMap, eyeMap, shufMap, numRan
     end
 
     %%% Pick saliency value at each eye fixation along with [numrandom] random points
-    [X Y] = find(eyeMap > 0);
-    [XRest YRest] = find(shufMap > 0);
+    [X, Y] = find(eyeMap > 0);
+    [XRest, YRest] = find(shufMap > 0);
     localHum = nan(length(X),1);
     localRan = nan(length(X),numRandom);
     

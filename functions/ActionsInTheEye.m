@@ -19,9 +19,9 @@ function valueSet = ReadEyeTrackingData(moviePath)
     for subjectNumber = 1:19
         
         if subjectNumber < 10
-            currentFileName = strcat('../',gazeFolder,'/samples/00',num2str(subjectNumber),'_' , filename , '.txt');
+            currentFileName = strcat('F:/Thesis/',gazeFolder,'/samples/00',num2str(subjectNumber),'_' , filename , '.txt');
         else
-            currentFileName = strcat('../',gazeFolder,'/samples/0',num2str(subjectNumber),'_' , filename , '.txt');
+            currentFileName = strcat('F:/Thesis/',gazeFolder,'/samples/0',num2str(subjectNumber),'_' , filename , '.txt');
         end
         
         if  ~exist(currentFileName, 'file')
@@ -45,14 +45,14 @@ function valueSet = ReadEyeTrackingData(moviePath)
     end
     
     % Read calibration of the experiment setup
-    fid = fopen( strcat('../',gazeFolder,'/geometry.txt') );
+    fid = fopen( strcat('F:/Thesis/',gazeFolder,'/geometry.txt') );
     data = textscan( fid , '%f %f %f %d %d' );
     screenResX   = cell2mat( data( 4 ) );
     screenResY   = cell2mat( data( 5 ) );
     fclose( fid );
     
     % Read screen resolution data
-    fid = fopen( strcat('../',gazeFolder,'/resolution.txt' ));
+    fid = fopen( strcat('F:/Thesis/',gazeFolder,'/resolution.txt' ));
     data = textscan( fid , '%s %d %d %f' );
     fclose( fid );
     vidNames =  [ data{ 1 } ] ;

@@ -1,10 +1,25 @@
 function F = ImageSaliency
     F.MyGbvs = @MyGbvs;
     F.MyJudd = @MyJudd;
+    F.MyItti = @MyItti;
     F.MySR = @MySR;
     F.MyGaussByOpticalFlow = @MyGaussByOpticalFlow;
-    F.Cigdem = @Cigdem;
+    F.ImpTrj = @ImpTrj;
     F.ActionsInTheEyeFixation = @ActionsInTheEyeFixation;
+end
+
+function saliencyMap = MyItti(moviePath,frames)
+    if nargin < 2
+        video = VideoReader( moviePath );
+        frames = read(video);
+    end
+    
+    [vidHeight, vidWidth, ~, nFrames] = size(frames);
+    saliencyMap = zeros(vidHeight,vidWidth,nFrames);
+    
+    for i = 1:nFrames
+        saliencyMap(:,:,i) = imresize(simpsal(frames(:,:,:,i)),[vidHeight vidWidth]);
+    end
 end
 
 function saliencyMap = MyJudd(moviePath,frames)
@@ -67,42 +82,52 @@ function saliencyMap = MyGaussByOpticalFlow(moviePath,frames)
     end
 end
 
-function saliencyMap = Cigdem(moviePath,trajectoriesByFrame)
+function saliencyMap = ImpTrj(moviePath,frames,impTrajectories)
 
     ImprovedT = ImprovedTrajectories;
-
-    if nargin < 2
-        [status,exeOutput] = ImprovedT.RunImprovedTrajectories(moviePath);
-        if status; return; end
-        impTrajectories = ImprovedT.AnalyzeOutput(exeOutput);
-        save([moviePath '_impTrajectories.mat'], 'impTrajectories');
+    Util = UtilFunctions;
+    Ret = RetargetMethods;
+    
+    if nargin < 3
+        if exist([moviePath '_impTrajectories.mat'], 'file') == 2
+            load([moviePath '_impTrajectories.mat']); 
+        else
+            [status,exeOutput] = ImprovedT.RunImprovedTrajectories(moviePath);
+            if status; return; end
+            impTrajectories = ImprovedT.AnalyzeOutput(exeOutput);
+            save([moviePath '_impTrajectories.mat'], 'impTrajectories');
+        end
     end
     
-    trajectoryStarts = ImprovedT.GetTrajectoryStarts(trajectories);
-    video = VideoReader( moviePath );
-    saliencyMap = zeros(video.Height,video.Width,video.NumberOfFrames);
-    for k = 1:video.NumberOfFrames
-
-        currentSaliencyMap = zeros(video.Height,video.Width);
-        currentTrajs = find(trajectoryStarts==k);
+    if exist([moviePath '_staticSaliencyMap.mat'], 'file') == 2
+        load([moviePath '_staticSaliencyMap.mat']); 
+    else
+        staticSaliency = MyJudd(moviePath,frames);
+        save([moviePath '_staticSaliencyMap.mat'], 'staticSaliency');
+    end
+    
+    [vidHeight,vidWidth,~,nFrames] = size(frames);
         
-        if isempty(currentTrajs); continue; end;
+    % Get trajectories to be used for saliency map
+    shotBoundaries = Util.ReadShotBoundaries(moviePath,nFrames);
+    keyFrames = Ret.GetKeyFrames(staticSaliency,shotBoundaries); 
+    seeds = ImprovedT.GetSeedTrjs(impTrajectories,keyFrames,shotBoundaries,...
+        staticSaliency(:,:,keyFrames));
+    impPts = round(Ret.GetPointsFromSeeds(impTrajectories,seeds)); 
+    
+    saliencyMap = zeros(vidHeight,vidWidth,nFrames);
+    gaussianFilter = fspecial('gaussian',[100 100],20);
+    for k = 1:nFrames
+
+        indices = impPts( : , 2 ) == k ;
+        if sum(indices) == 0; continue; end;
         
-        xIndices = round(trajectories(currentTrajs).trajectory(1,:));
-        yIndices = round(trajectories(currentTrajs).trajectory(2,:));
-
-        xIndices(xIndices<1) = 1;
-        yIndices(yIndices<1) = 1;
-        xIndices(xIndices>video.Width) = video.Width;
-        yIndices(yIndices>video.Height) = video.Height;
-
-        for t = 1:size(xIndices,2)
-            currentSaliencyMap(yIndices(t),xIndices(t))=1;
+        currentSaliencyMap = zeros(vidHeight,vidWidth);
+        for t = 1:size(indices,2)
+            currentSaliencyMap(impPts(indices,3),impPts(indices,4))=1;
         end
 
-        gaussianFilter = fspecial('gaussian',[100 100],20);
         saliencyMap(:,:,k) = mat2gray(conv2(currentSaliencyMap,gaussianFilter,'same'));
-
     end
 end
 
@@ -129,17 +154,20 @@ function saliencyMap = MySR(moviePath,frames)
     
 end
 
-function saliencyMap = ActionsInTheEyeFixation(moviePath)
+function saliencyMap = ActionsInTheEyeFixation(moviePath,frames,duration)
     
-    video = VideoReader( moviePath );
-    frames = read(video);
+    if nargin < 3
+        video = VideoReader( moviePath );
+        frames = read(video);
+        duration = video.Duration;
+    end
     
     [vidHeight, vidWidth, ~, nFrames] = size(frames);   
     saliencyMap = zeros(vidHeight,vidWidth,nFrames);
     
     AITE = ActionsInTheEye;
     resultMap = AITE.ReadEyeTrackingData(moviePath);
-    resultMap.vidDuration = video.Duration;
+    resultMap.vidDuration = duration;
     resultMap.nFrames = nFrames;
     saliencyPoints = AITE.CalculateMapping(resultMap);
     
