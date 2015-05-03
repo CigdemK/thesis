@@ -1,6 +1,5 @@
 clear,clc;
-
-movieNames = {'F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00001.avi'};
+movieNames = {'F:\Tez\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00161.avi'};
 methodName = {'Wang'};
 tic;
 ret = RetargetMethods;
@@ -8,24 +7,23 @@ for i = 1:size(movieNames,2)
     
     video = VideoReader(movieNames{i});
     frames = read(video);
-    
+
     for j = 1:size(methodName,2)
         
         currentMethod = methodName{j};
         switch currentMethod
             case 'Wang'
-                retFrames = ret.Wang2011(frames,[16*20 9*20]);
+                retFrames = ret.Wang2011(frames,[16*25 size(frames,1)],movieNames{i});
             case 'Rubinstein2009'
                 retFrames = ret.Rubinstein2009(frames,[video.Height 16*20]);save('tmp1.mat','retFrames');
-                retFrames = ret.Rubinstein2009(retFrames,[9*20 16*20]);save('tmp2.mat','retFrames');
             case 'Yan2013_Mine'
                 retFrames = ret.Yan2013_Mine(frames,[round(video.Height) round(size(frames,2)-10)]);
             case 'Yan2013'
                 retFrames = ret.Yan2013(frames,[video.Height round(size(frames,2)-50)]);
             case 'Linear'
                 retFrames = ret.LinearScaling(frames,[304 516]);
-            case 'Cigdem'
-                retFrames = ret.Cigdem(movieNames{i},frames,[16*10 9*10]);
+            case 'Cigdem'   
+                retFrames = ret.Cigdem(movieNames{i},frames,[16*25 9*25]);
             otherwise
                 disp('No such retargeting algoritm!')
         end
@@ -37,10 +35,14 @@ for i = 1:size(movieNames,2)
         close(writerObj);
         
     end
-    toc;
+   disp movieNames{i};
 end
 
-
+%  writerObj = VideoWriter( 'actioncliptest00054_Rub.avi');
+%         writerObj.FrameRate = 25;
+%         open(writerObj);
+%         writeVideo(writerObj,retargetedFrames);
+%         close(writerObj);
 
 
 % % save retargeted video

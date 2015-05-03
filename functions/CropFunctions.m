@@ -90,20 +90,31 @@ end
 function [frames] = RemoveBlackBars(frames)
 
     [vHeight, vWidth, vDepth, nFrames] = size(frames);
-    indices = [];
+
+    firstFrame = frames(:,:,:,1);
     
     % Detect the rows to be removed
+    indices = [];
     for j = 1:vHeight
-        line = frames(:,:,:,1);
-        if (length(line(line(1,:,:)<20)) == vWidth*vDepth)
+        if (length(firstFrame(firstFrame(j,:,:)<20)) == vWidth*vDepth)
             indices = [indices;j];   
         end
     end
     
     % Remove rows from all frames
-    for n = 1:nFrames
-        frames(indices,:,:,n) = [];
+    frames(indices,:,:,:) = [];
+    
+    indices = [];
+    % Detect columns to be removed
+    for j = 1:vWidth
+        if (length(firstFrame(firstFrame(:,j,:)<20)) == vHeight*vDepth)
+            indices = [indices;j];   
+        end
     end
+    
+    % Remove columns from all frames
+    frames(:,indices,:,:) = [];
+
 end
 
 % PRIVATE FUNCTIONS
@@ -114,8 +125,8 @@ function cropSize = ChangeCropSize( extremes , center , newSize, maxSize)
     Y = extremes(2,:);
     cropRatio = newSize(1)/newSize(2); % must preserve ratio
 
-    XDiff = abs(X - center(1)) - newSize(1)/2;
-    YDiff = abs(Y - center(2)) - newSize(2)/2;   
+    XDiff = abs(X - center(2)) - newSize(1)/2;
+    YDiff = abs(Y - center(1)) - newSize(2)/2;   
     
     XDiff = XDiff(XDiff>0);
     YDiff = YDiff(YDiff>0);
@@ -123,6 +134,7 @@ function cropSize = ChangeCropSize( extremes , center , newSize, maxSize)
     cropSize(1) = newSize(1)/2 + max([XDiff 0]);
     cropSize(2) = newSize(2)/2 + max([YDiff 0]);
     
+    loopcounter = 0;
     while(true)
         
         % Equalize the crop ratio
@@ -133,18 +145,22 @@ function cropSize = ChangeCropSize( extremes , center , newSize, maxSize)
         end
 
         % check boundary violations
-        tooLargeX = center(1) + cropSize(1) > maxSize(1);
-        tooLargeY = center(2) + cropSize(2) > maxSize(2);
-        tooSmallX = center(1) - cropSize(1) < 1;
-        tooSmallY = center(2) - cropSize(2) < 1;
+        tooLargeX = center(2) + cropSize(1) > maxSize(1);
+        tooLargeY = center(1) + cropSize(2) > maxSize(2);
+        tooSmallX = center(2) - cropSize(1) < 1;
+        tooSmallY = center(1) - cropSize(2) < 1;
 
-        if tooSmallX;  cropSize(1) = center(1); end;
-        if tooSmallY;  cropSize(2) = center(2); end;
-        if tooLargeX;  cropSize(1) = maxSize(1) - center(1); end;
-        if tooLargeY;  cropSize(2) = maxSize(2) - center(2); end;
+        if tooSmallX;  cropSize(1) = center(2); end;
+        if tooSmallY;  cropSize(2) = center(1); end;
+        if tooLargeX;  cropSize(1) = maxSize(1) - center(2); end;
+        if tooLargeY;  cropSize(2) = maxSize(2) - center(1); end;
         
         if abs(cropSize(1)/cropSize(2) - cropRatio)<0.00001; break; end;
-        
+        if loopcounter > 100
+            break;
+        else
+            loopcounter = loopcounter+1;
+        end
     end
 
     cropSize = cropSize .*2;

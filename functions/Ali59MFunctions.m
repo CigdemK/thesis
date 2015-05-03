@@ -123,6 +123,7 @@ function avgKeys = CalculateMeanSaliency(eyes, shotBoundaries)
     avgKeys = [];
     for i = 1:nShots
         availableFrame = min(avgAll(avgAll(:,1) >= shotBoundaries(i)));
+        if isempty(availableFrame); continue; end;
         maskVector = avgAll(:,1)<=(availableFrame+3) & ...
             avgAll(:,1)>=(availableFrame);
         avgKeys = [avgKeys;mean(avgAll(maskVector,2:3),1)];

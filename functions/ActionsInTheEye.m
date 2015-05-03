@@ -5,7 +5,7 @@ end
 
 function valueSet = ReadEyeTrackingData(moviePath)
 
-    if regexp( moviePath, '.*ucf.*') 
+    if regexp( moviePath, '.*ucf.*')
         gazeFolder = 'gaze_ucfsa';
         regexResult = regexp(moviePath,'\','split');
         filename = [regexResult{end-2} '_' regexResult{end-1} '.avi'];
@@ -14,14 +14,16 @@ function valueSet = ReadEyeTrackingData(moviePath)
         filename = regexResult{end};
         gazeFolder  = 'gaze_hollywood2';
     end
-   
+
     % Read eye tracking data
     for subjectNumber = 1:19
         
         if subjectNumber < 10
-            currentFileName = strcat('F:/Thesis/',gazeFolder,'/samples/00',num2str(subjectNumber),'_' , filename , '.txt');
+            currentFileName = ['C:\Users\ckocb_000\Downloads\samples/00' num2str(subjectNumber) '_'  filename  '.txt'];
+%             currentFileName = strcat('C:\Users\ckocb_000\Downloads/',gazeFolder,'/samples/00',num2str(subjectNumber),'_' , filename , '.txt');
         else
-            currentFileName = strcat('F:/Thesis/',gazeFolder,'/samples/0',num2str(subjectNumber),'_' , filename , '.txt');
+            currentFileName = ['C:\Users\ckocb_000\Downloads\samples/0' num2str(subjectNumber) '_'  filename  '.txt'];
+%             currentFileName = strcat('C:\Users\ckocb_000\Downloads/',gazeFolder,'/samples/0',num2str(subjectNumber),'_' , filename , '.txt');
         end
         
         if  ~exist(currentFileName, 'file')
@@ -45,14 +47,16 @@ function valueSet = ReadEyeTrackingData(moviePath)
     end
     
     % Read calibration of the experiment setup
-    fid = fopen( strcat('F:/Thesis/',gazeFolder,'/geometry.txt') );
+%     fid = fopen( strcat('F:/Thesis/',gazeFolder,'/geometry.txt') );
+    fid = fopen( strcat('C:\Users\ckocb_000\Downloads/geometry.txt') );
     data = textscan( fid , '%f %f %f %d %d' );
     screenResX   = cell2mat( data( 4 ) );
     screenResY   = cell2mat( data( 5 ) );
     fclose( fid );
     
     % Read screen resolution data
-    fid = fopen( strcat('F:/Thesis/',gazeFolder,'/resolution.txt' ));
+%     fid = fopen( strcat('F:/Thesis/',gazeFolder,'/resolution.txt' ));
+    fid = fopen( strcat('C:\Users\ckocb_000\Downloads/resolution.txt') );
     data = textscan( fid , '%s %d %d %f' );
     fclose( fid );
     vidNames =  [ data{ 1 } ] ;

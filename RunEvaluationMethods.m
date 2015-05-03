@@ -1,22 +1,21 @@
 clc,clear;
 
 warning off MATLAB:MKDIR:DirectoryExists
-load('D.mat');
-for j = 91:870
-    currentRes = struct(); 
-    currentRes.path = ['F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest000' num2str(j+9) '.avi'];
-    currentRes.methods = cell(1,1);
-    currentRes.results = zeros(1,1);
-    D(j) = currentRes;
+% load('data\newD.mat');
+F = dir('F:\Tez\Thesis\Hollywood2-actions\Hollywood2\UserStudy\mp4\*.avi');
+
+methodName = {'MSE','UQI','Blur','Focus','Sharpness','Brightness','Compress','PSNR'};
+D = struct('methods',{},'results',[]);
+for i = 1: length(F)
+    D(i).methods = {0};
+    D(i).results = [0];
 end
 
-methodName = {'UQI'};
-%100,70,130,62,10,13,34,29,18
 tic;
 Eval=EvaluationMetrics;
-for j = 91:870
-    
-    videoPath = ['F:\Thesis\Hollywood2-actions\Hollywood2\AVIClips\actioncliptest00' num2str(j+9) '.avi'];
+for j = 1:length(F)
+
+    videoPath = ['F:\Tez\Thesis\Hollywood2-actions\Hollywood2\UserStudy\mp4\' F(j).name];
     
     video = VideoReader(videoPath);
     frames = read(video);
@@ -77,31 +76,31 @@ for j = 91:870
         else
             D(j).results(end+1) = res;
         end
-        toc;
     end
-    
+    save('data\newD.mat','D');
+    toc;
 end
 
-% Dnew = D;
-% load('D.mat');
-% for i = 1: size(D,2)
-%     D(i).methods = [D(i).methods,Dnew(i).methods(2:end)];
-%     D(i).results = [D(i).results,Dnew(i).results(2:end)];
+
+% load('data\D.mat');
+% for i = 93: size(D,2)
+%     D(i).methods = D(i).methods(2:9);
+%     D(i).results = D(i).results(2:9);
 % end
-save('Dnew.mat','D');
+% save('data\D.mat','D');
 
-max = 0.885783403663150;
-ind = 0;
-for i = 91:112
-    if D(i).results(2)>max
-        max = D(i).results(2);
-        ind = i;
-    end
-end
-% % delete info from D
+% max = 0.885783403663150;
+% ind = 0;
+% for i = 91:112
+%     if D(i).results(2)>max
+%         max = D(i).results(2);
+%         ind = i;
+%     end
+% end
+% delete info from D
 % clc,clear;
-% load('D.mat');
-% for i = 1: size(D,2)
+% load('data\D.mat');
+% for i = 91: size(D,2)
 %     D(i).methods = D(i).methods(2:end);
 %     D(i).results = D(i).results(2:end);
 % end

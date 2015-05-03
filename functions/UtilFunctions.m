@@ -61,6 +61,9 @@ function [shotBoundaries] = ReadShotBoundaries( videoPath, nFrames )
     
     shotPath = strrep(videoPath, 'AVIClips', 'ShotBounds');
     shotPath = strrep(shotPath, 'avi', 'sht');
+%     vidName = regexp(videoPath,'\\','split');
+%     vidName = regexp(vidName{end},'\.','split');
+%     shotPath = ['F:\Tez\Thesis\Hollywood2-actions\Hollywood2\ShotBounds\' vidName{1} '.sht'];
     
     shotBoundaries = load(shotPath);
     shotBoundaries = [1;shotBoundaries';nFrames];

@@ -76,7 +76,7 @@ function seeds = GetSeedTrjs(trajectories,keyFrames,shotBoundaries,staticSalienc
     nFrames = trajectories(end).frameNum;
     nShots = size(shotBoundaries,1)-1;
     nTrajectories = size(trajectories,2);
-    
+
     staticSaliency(staticSaliency<0.7) = 0;
   
     % Group trajectories according to their start frame
@@ -85,13 +85,14 @@ function seeds = GetSeedTrjs(trajectories,keyFrames,shotBoundaries,staticSalienc
     trajectoryStarts = trajectoryEnds - trajectoryLengths + 1;
     
     % Get valid trajectories (remove inter-shot trajectories)
-    isInsideShotBoundaries = arrayfun(@(X)(trajectoryStarts > shotBoundaries(X) & ...
-        trajectoryEnds < shotBoundaries(X+1)),1:nShots,'UniformOutput',false);
+    isInsideShotBoundaries = arrayfun(@(X)((trajectoryStarts >= shotBoundaries(X) & ...
+        trajectoryEnds <= shotBoundaries(X+1))),1:nShots,'UniformOutput',false);
     isInsideShotBoundaries = any(cell2mat(isInsideShotBoundaries'),1);
+
     validTrajectoryIndices = find(isInsideShotBoundaries)';
     trajectoryStarts = trajectoryStarts(isInsideShotBoundaries)'; 
     nTrajectories = size(trajectories,2);
-    
+
     % Get seed trajectories from key frames
     seeds = [];
     seedStarts = [];
@@ -100,7 +101,7 @@ function seeds = GetSeedTrjs(trajectories,keyFrames,shotBoundaries,staticSalienc
         currentFrame = keyFrames(k);
         
         % Get trajectories that can touch current key frame
-        possibleTrajs = find(trajectoryStarts>=currentFrame-12 & ...
+        possibleTrajs = find(trajectoryStarts>=currentFrame-14 & ...
             trajectoryStarts<=currentFrame);
         possibleStarts = trajectoryStarts(possibleTrajs);
         possibleTrajs = validTrajectoryIndices(possibleTrajs);
@@ -108,9 +109,10 @@ function seeds = GetSeedTrjs(trajectories,keyFrames,shotBoundaries,staticSalienc
         
         % Get positions of these trajectories on current key frame
         currentX = arrayfun(@(X)trajectories(possibleTrajs(X)).trajectory( ...
-            2,currentFrame-possibleStarts(X)+1),1:nrIndices);
-        currentY = arrayfun(@(X)trajectories(possibleTrajs(X)).trajectory( ...
             1,currentFrame-possibleStarts(X)+1),1:nrIndices);
+        currentY = arrayfun(@(X)trajectories(possibleTrajs(X)).trajectory( ...
+            2,currentFrame-possibleStarts(X)+1),1:nrIndices);
+
         currentX = floor(currentX)';
         currentY = floor(currentY)';
         currentX(currentX==0) = 1;
@@ -136,8 +138,8 @@ function seeds = GetSeedTrjs(trajectories,keyFrames,shotBoundaries,staticSalienc
 
             % Get trajectory data of found trajectories
             possibleTrajsData   = [trajectories(possibleTrajs).trajectory]';
-            possibleTrajsX      = reshape(possibleTrajsData(:,1),[13,size(possibleTrajsData,1)/13])'; 
-            possibleTrajsY      = reshape(possibleTrajsData(:,2),[13,size(possibleTrajsData,1)/13])'; 
+            possibleTrajsX      = reshape(possibleTrajsData(:,1),[15,numel(possibleTrajs)])'; 
+            possibleTrajsY      = reshape(possibleTrajsData(:,2),[15,numel(possibleTrajs)])'; 
 
             % Get seeds from upcoming 10 frames
             possibleSeeds       = arrayfun(@(X)seeds(seedStarts==(k+X)),0:9, 'UniformOutput', false);
@@ -149,8 +151,9 @@ function seeds = GetSeedTrjs(trajectories,keyFrames,shotBoundaries,staticSalienc
 
             % Get trajectory data of seeds
             possibleSeedsData   = [trajectories(possibleSeeds).trajectory]';
-            possibleSeedsX      = reshape(possibleSeedsData(:,1),[13,size(possibleSeedsData,1)/13])'; 
-            possibleSeedsY      = reshape(possibleSeedsData(:,2),[13,size(possibleSeedsData,1)/13])';
+%             possibleSeedsData   = trjs(possibleSeeds,:,:)';
+            possibleSeedsX      = reshape(possibleSeedsData(:,1),[15,numel(possibleSeeds)])'; 
+            possibleSeedsY      = reshape(possibleSeedsData(:,2),[15,numel(possibleSeeds)])';
 
             % Get the difference between seed starts and current frame
             possibleStartDiff = possibleSeedStarts-k;
@@ -176,8 +179,8 @@ function seeds = GetSeedTrjs(trajectories,keyFrames,shotBoundaries,staticSalienc
             possibleTrajsY = cell2mat(arrayfun(@(X)[possibleTrajsY(:,possibleStartDiff(X)+1:end,1),...
                 zeros(nrTrajs,possibleStartDiff(X))], 1:nrSeeds,'uni',false)');
 
-            possibleTrajsX = reshape(possibleTrajsX,[nrTrajs nrSeeds 13]);
-            possibleTrajsY = reshape(possibleTrajsY,[nrTrajs nrSeeds 13]);
+            possibleTrajsX = reshape(possibleTrajsX,[nrTrajs nrSeeds 15]);
+            possibleTrajsY = reshape(possibleTrajsY,[nrTrajs nrSeeds 15]);
 
             possibleTrajsX = permute(possibleTrajsX,[1 3 2]);
             possibleTrajsY = permute(possibleTrajsY,[1 3 2]);
