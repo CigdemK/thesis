@@ -1,24 +1,29 @@
 clc,clear;
 
 warning off MATLAB:MKDIR:DirectoryExists
-% load('data\newD.mat');
-F = dir('F:\Tez\Thesis\Hollywood2-actions\Hollywood2\UserStudy\mp4\*.avi');
 
-methodName = {'MSE','UQI','Blur','Focus','Sharpness','Brightness','Compress','PSNR'};
-D = struct('methods',{},'results',[]);
-for i = 1: length(F)
-    D(i).methods = {0};
-    D(i).results = [0];
-end
+F = dir('E:\Tez\Thesis\userStudy\originalAvi\*.avi');
+
+methodName = {'mySSIM'};
 
 tic;
 Eval=EvaluationMetrics;
 for j = 1:length(F)
 
-    videoPath = ['F:\Tez\Thesis\Hollywood2-actions\Hollywood2\UserStudy\mp4\' F(j).name];
+    D = struct('methods',{},'results',[]);
+    D(1).methods = {0};
+    D(1).results = {0};
+
+    videoPath = ['E:\Tez\Thesis\userStudy\originalAvi\' F(j).name];
+    
+    res = regexp(F(j).name,'_','split');
+    originalPath = ['E:\Tez\Thesis\userStudy\originalAvi\linear\' res{1} '_Linear.avi'];
     
     video = VideoReader(videoPath);
     frames = read(video);
+    
+    video = VideoReader(originalPath);
+    originalFrames = read(video);
     
     for i = 1:size(methodName,2)
         
@@ -65,49 +70,25 @@ for j = 1:length(F)
                 res = Eval.MetrixMuxIFC(videoPath,frames);
             case 'Compress'
                 res = Eval.CompressVideo(videoPath,frames);
+            case 'mySSIM'
+                res = Eval.SSIM(originalFrames,frames);
             otherwise
                 disp([methodName{i} ': No such evaluation method!']);
                 res = [];
         end
-
-        D(j).methods{end+1} = currentMethod;
-        if length(res)>1
-            D(j).results(end+1) = mean(res(1:end-1));
-        else
-            D(j).results(end+1) = res;
-        end
+        D.methods{end+1} = currentMethod;
+        D.results{end+1} = res;
     end
-    save('data\newD.mat','D');
+    save(['E:\Tez\Thesis\userStudy\metricResults\' F(j).name '_ssim.mat'],'D');
     toc;
 end
 
-
-% load('data\D.mat');
-% for i = 93: size(D,2)
-%     D(i).methods = D(i).methods(2:9);
-%     D(i).results = D(i).results(2:9);
-% end
-% save('data\D.mat','D');
-
-% max = 0.885783403663150;
-% ind = 0;
-% for i = 91:112
-%     if D(i).results(2)>max
-%         max = D(i).results(2);
-%         ind = i;
-%     end
-% end
-% delete info from D
-% clc,clear;
-% load('data\D.mat');
-% for i = 91: size(D,2)
-%     D(i).methods = D(i).methods(2:end);
-%     D(i).results = D(i).results(2:end);
-% end
-% save('D.mat','D');
 
 
 % methodName = {'Compress','PSNR','MSE','VIFP','VIF','VSNR','MSSIM','SSIM',...
 %             'UQI','SNR','WSNR','NQM','IFC','DivisiveNormalization','Focus',...
 %             'Blur','Sharpness','Brightness'};
 % {'Focus','Blur','Sharpness','Brightness','UQI','Compress','MSE','PSNR'}
+
+
+

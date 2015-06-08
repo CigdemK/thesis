@@ -20,6 +20,18 @@ function F = EvaluationMetrics
     F.MetrixMuxWSNR = @MetrixMuxWSNR;
     F.MetrixMuxNQM = @MetrixMuxNQM;
     F.MetrixMuxIFC = @MetrixMuxIFC;
+    F.SSIM = @SSIM;
+end
+
+function D = SSIM(originalFrames,comparisonFrames)
+    
+    nFrames = size(comparisonFrames,4);
+    
+    D = zeros(nFrames,1);
+    for i = 1:nFrames-1 
+        D(i) = ssim(comparisonFrames(:,:,:,i),originalFrames(:,:,:,i));
+    end
+    
 end
 
 function D = JerkinessMatlab(videoPath,frames)
